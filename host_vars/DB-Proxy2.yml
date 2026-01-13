@@ -1,0 +1,27 @@
+# DB Proxy 2 (Standby) 
+ansible_host: 10.2.2.21
+
+nic_count: 2
+# eth0 - Service Network
+nic1_interface: ens192
+nic1_ip_address: 10.2.2.21
+nic1_netmask: 255.255.255.0
+nic1_gateway: 10.2.2.1
+nic1_dns: 8.8.8.8
+
+# VIP for eth0
+keepalived_vip_interface: ens192
+keepalived_vip: 10.2.2.254
+keepalived_priority: 90
+keepalived_state: BACKUP
+
+# eth1 - Backend Network
+nic2_interface: ens160
+nic2_ip_address: 10.2.3.10
+nic2_netmask: 255.255.255.0
+# GW, DNS 굳이 설정 X
+
+# VIP for eth1
+keepalived_internal_vip_interface: ens160
+keepalived_internal_vip: 10.2.3.254
+keepalived_internal_vip_cidr: 24

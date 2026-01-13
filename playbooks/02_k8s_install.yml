@@ -1,0 +1,78 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 02: Kubernetes Install - 쿠버네티스 클러스터 구축
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1단계: 마스터 + 워커 공통 설정 (containerd, kubeadm 등)
+# ─────────────────────────────────────────────────────────────────────────────
+- name: K8s 클러스터 공통 설정
+  hosts: K8S_Cluster
+  become: yes
+  roles:
+    - k8s_base
+  tags:
+    - k8s
+    - k8s_base
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1.5단계: Control Plane 로드밸런싱 구성 (HAProxy + Keepalived)
+# - 역할: 마스터 노드 간의 부하 분산 및 VIP(10.2.2.100) 제공
+# - 수행서버: PC2 (K8S-ControlPlane1~3)
+# ─────────────────────────────────────────────────────────────────────────────
+- name: K8S Control Plane HA 구성 (Keepalived + HAProxy)
+  hosts: K8S_Control_Plane
+  become: yes
+  roles:
+    - keepalived_haproxy
+  tags:
+    - k8s
+    - ha
+    - keepalived
+    - haproxy
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2단계: Primary Master 초기화 (kubeadm init)
+# - 역할: 클러스터의 첫 번째 리더 노드를 생성합니다.
+# - 수행서버: PC2의 1번 노드 (K8S-ControlPlane1)
+# ─────────────────────────────────────────────────────────────────────────────
+- name: K8s Primary Master 초기화
+  hosts: K8S_Primary_Master
+  become: yes
+  vars:
+    k8s_role_mode: "init"
+  roles:
+    - k8s_master
+  tags:
+    - k8s
+    - k8s_master
+    - k8s_primary
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3단계: Secondary Masters 조인 (kubeadm join --control-plane)
+# - 역할: 리더 노드에게 인증서를 받아 공동 리더로 합류합니다. (HA 구성)
+# - 수행서버: PC2의 2, 3번 노드
+# ─────────────────────────────────────────────────────────────────────────────
+- name: K8s Secondary Masters 조인
+  hosts: K8S_Secondary_Masters
+  become: yes
+  vars:
+    k8s_role_mode: "join_master"
+  roles:
+    - k8s_master
+  tags:
+    - k8s
+    - k8s_master
+    - k8s_secondary
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3단계: 워커 노드 클러스터 조인
+# ─────────────────────────────────────────────────────────────────────────────
+- name: K8s 워커 노드 조인
+  hosts: K8S_Workers
+  become: yes
+  roles:
+    - k8s_worker
+  tags:
+    - k8s
+    - k8s_worker

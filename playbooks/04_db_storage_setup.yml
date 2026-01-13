@@ -1,0 +1,59 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 04: DB & Storage Setup - 데이터베이스 및 스토리지 설정
+# ═══════════════════════════════════════════════════════════════════════════
+- name: MySQL Master (DB-A) 설정
+  # 설명: 쓰기(Write) 작업이 수행되는 메인 데이터베이스 서버
+  hosts: DB-Active
+  become: yes
+  roles:
+    - mysql_master_slave
+  vars:
+    mysql_role: master
+  tags:
+    - db
+    - mysql_master
+
+- name: MySQL Slave (DB-S) 설정
+  # 설명: Master의 데이터를 실시간으로 복제받는 읽기 전용(Read-Only) 서버
+  hosts: DB-Standby
+  become: yes
+  roles:
+    - mysql_master_slave
+  vars:
+    mysql_role: slave
+  tags:
+    - db
+    - mysql_slave
+
+- name: MySQL Backup (DB-B) 설정
+  # 설명: 데이터 백업을 전담하는 서버
+  hosts: DB-Backup
+  become: yes
+  roles:
+    - mysql_master_slave
+  vars:
+    mysql_role: backup
+  tags:
+    - db
+    - mysql_backup
+
+- name: DB Proxies Setup
+  # 설명: 애플리케이션의 DB 요청을 Master(쓰기)/Slave(읽기)로 분산시켜주는 미들웨어
+  hosts: DB_Proxies
+  become: yes
+  roles:
+    - db_proxy
+  tags:
+    - db
+    - proxysql
+
+- name: DB Servers Setup
+  # 설명: K8S와 DB 서버들이 공통으로 사용할 NFS 스토리지 마운트
+  hosts: DB_Servers
+  become: yes
+  roles:
+    - storage_mount
+  tags:
+    - db
+    - storage

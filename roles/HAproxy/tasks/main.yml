@@ -1,0 +1,17 @@
+---
+- name: 1. HAProxy 패키지 설치
+  dnf:
+    name: haproxy
+    state: present
+
+- name: 2. HAProxy 설정 파일 배포 (Jinja2 템플릿 사용)
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+  notify: restart haproxy
+
+- name: 3. HAProxy 서비스 활성화
+  service:
+    name: haproxy
+    state: started
+    enabled: yes

@@ -1,0 +1,29 @@
+# DB Proxy 1 (Active) 
+# Role: Load balancing for DBs with Keepalived
+ansible_host: 10.2.2.20
+
+nic_count: 2
+# eth0 - Service Network
+nic1_interface: ens192
+nic1_ip_address: 10.2.2.20
+nic1_netmask: 255.255.255.0
+nic1_gateway: 10.2.2.1
+nic1_dns: 8.8.8.8
+
+# VIP for eth0
+keepalived_vip_interface: ens192
+keepalived_vip: 10.2.2.254
+keepalived_priority: 100
+keepalived_state: MASTER
+
+# eth1 - Backend Network (Warning: verify interface routing)
+nic2_interface: ens160
+nic2_ip_address: 10.2.3.1
+nic2_netmask: 255.255.255.0
+# GW matches Internal VIP for servers, but Proxy shouldn't use it as GW?
+# User said "GW, DNS 굳이 설정 X" for eth1
+
+# VIP for eth1 (Internal VIP)
+keepalived_internal_vip_interface: ens160
+keepalived_internal_vip: 10.2.3.254
+keepalived_internal_vip_cidr: 24

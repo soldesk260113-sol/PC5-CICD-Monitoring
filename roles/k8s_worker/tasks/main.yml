@@ -1,0 +1,56 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# K8s Worker Role - 워커 노드 전용 설정
+# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. 클러스터 조인 준비
+# ─────────────────────────────────────────────────────────────────────────────
+- name: 1-1. kubelet 서비스 시작
+  ansible.builtin.service:
+    name: kubelet
+    state: started
+    enabled: yes
+
+- name: 1-2. 이미 클러스터에 조인되었는지 확인
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. 마스터 노드에서 조인 토큰 가져오기
+# ─────────────────────────────────────────────────────────────────────────────
+- name: 2-1. 마스터에서 조인 명령어 가져오기
+  delegate_to: "{{ groups['K8S_Master'][0] }}"
+  ansible.builtin.command: kubeadm token create --print-join-command
+  register: join_command
+  run_once: true
+  when: not kubelet_conf.stat.exists
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. 클러스터 조인
+# ─────────────────────────────────────────────────────────────────────────────
+- name: 3-1. 워커 노드 클러스터 조인
+  ansible.builtin.command: "{{ join_command.stdout }}"
+  when:
+    - not kubelet_conf.stat.exists
+    - join_command is defined
+    - join_command.stdout is defined
+  register: join_result
+
+- name: 3-2. 조인 결과 출력
+  ansible.builtin.debug:
+    msg: "{{ join_result.stdout_lines | default(['이미 클러스터에 조인됨']) }}"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. 워커 노드 방화벽 설정
+# ─────────────────────────────────────────────────────────────────────────────
+- name: 4-1. 워커 노드 포트 방화벽 허용
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: yes
+    immediate: yes
+    state: enabled
+  loop:
+    - 10250  # Kubelet API
+    - 30000-32767  # NodePort Services
+  ignore_errors: yes

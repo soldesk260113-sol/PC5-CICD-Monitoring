@@ -1,0 +1,91 @@
+---
+# Harbor Docker Registry 설치 및 설정
+
+- name: 1. Docker 설치 (의존성)
+  include_role:
+    name: docker
+
+- name: 2. Docker Compose 독립 실행파일 설치
+  get_url:
+    url: https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+
+- name: 3. Harbor 설치 디렉토리 생성
+  file:
+    path: /opt/harbor
+    state: directory
+    mode: '0755'
+
+- name: 4. Harbor 설치 파일 다운로드
+  get_url:
+    url: https://github.com/goharbor/harbor/releases/download/v2.9.0/harbor-offline-installer-v2.9.0.tgz
+    dest: /tmp/harbor-offline-installer-v2.9.0.tgz
+    mode: '0644'
+  register: harbor_download
+
+- name: 5. Harbor 압축 해제
+  unarchive:
+    src: /tmp/harbor-offline-installer-v2.9.0.tgz
+    dest: /opt
+    remote_src: yes
+  when: harbor_download.changed
+
+- name: 6. Harbor 설정 파일 배포
+  template:
+    src: harbor.yml.j2
+    dest: /opt/harbor/harbor.yml
+    mode: '0644'
+
+- name: 7. Harbor 설치 스크립트 실행
+  shell: |
+    cd /opt/harbor
+    ./install.sh --with-trivy
+  args:
+    creates: /opt/harbor/common/config/core/env
+  register: harbor_install
+
+- name: 8. Harbor 서비스 시작 확인
+  shell: docker compose ps
+  args:
+    chdir: /opt/harbor
+  register: harbor_status
+  changed_when: false
+
+- name: 9. Harbor 상태 출력
+  debug:
+    msg: "{{ harbor_status.stdout_lines }}"
+
+- name: 10. Firewall 포트 개방 (Harbor HTTP)
+  firewalld:
+    port: "{{ harbor_http_port }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: 11. Firewall 포트 개방 (Harbor HTTPS)
+  firewalld:
+    port: "{{ harbor_https_port }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: ansible_facts['os_family'] == "RedHat" and harbor_https_enabled
+
+- name: 12. Harbor 접속 정보 출력
+  debug:
+    msg:
+      - "Harbor 설치 완료!"
+      - "접속 URL: http://{{ harbor_hostname }}:{{ harbor_http_port }}"
+      - "관리자 계정: admin"
+      - "관리자 비밀번호: {{ harbor_admin_password }}"
+      - "Docker 로그인: docker login {{ harbor_hostname }}:{{ harbor_http_port }}"
+
+- name: Harbor 포트 포워딩 (172.16.6.61:5000 -> 10.2.2.40:5000)
+  firewalld:
+    rich_rule: 'rule family="ipv4" forward-port port="5000" protocol="tcp" to-port="5000" to-addr="10.2.2.40"'
+    permanent: yes
+    immediate: yes
+    state: enabled
+  delegate_to: SECURE
+  run_once: true

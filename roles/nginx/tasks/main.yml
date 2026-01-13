@@ -1,0 +1,16 @@
+---
+- name: 1. Nginx 설치
+  dnf:
+    name: nginx
+    state: present
+
+- name: 2. 기본 인덱스 페이지 생성 (테스트용)
+  copy:
+    content: "<h1>Welcome to PC2 Web Server</h1>"
+    dest: /usr/share/nginx/html/index.html
+
+- name: 3. Nginx 서비스 시작
+  service:
+    name: nginx
+    state: started
+    enabled: yes

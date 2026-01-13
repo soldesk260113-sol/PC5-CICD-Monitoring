@@ -1,0 +1,264 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 03: Deploy Monitoring - 모니터링 시스템 배포
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 1단계: 모니터링 서버에 Prometheus + Grafana 스택 배포
+- name: 모니터링 서버 설정 (Prometheus + Grafana)
+  hosts: Monitoring
+  become: yes
+  roles:
+    - monitoring
+  tags:
+    - monitoring
+    - prometheus
+    - grafana
+
+  tasks:
+    # [설정] Local Mail Delivery (Postfix) - Alertmanager 알림용
+    - name: Postfix 패키지 설치 (s-nail 포함)
+      dnf:
+        name: 
+          - postfix
+          - s-nail
+        state: present
+      ignore_errors: yes
+
+    - name: Postfix 설정 (모든 인터페이스 리슨)
+      lineinfile:
+        path: /etc/postfix/main.cf
+        regexp: '^inet_interfaces ='
+        line: 'inet_interfaces = all'
+        state: present
+
+    - name: Postfix 서비스 시작 및 활성화
+      service:
+        name: postfix
+        state: started
+        enabled: yes
+
+    - name: firewalld SMTP 포트 열기 (25/tcp)
+      firewalld:
+        port: 25/tcp
+        permanent: yes
+        immediate: yes
+        state: enabled
+
+# 2단계: 모든 서버에 Node Exporter 설치 (바이너리 방식)
+# 설명: 모든 서버의 CPU, 메모리, 디스크 정보를 수집. 
+#Prometheus로 보내는 에이전트(Node Exporter) 설치.
+# 참고: Storage(NAS)는 SSH 접근 불가로 제외
+- name: Node Exporter 설치 (모든 서버)
+  hosts: All_Nodes:!Storage
+  become: yes
+  max_fail_percentage: 50
+  gather_facts: no
+  vars:
+    node_exporter_version: "1.7.0"
+  tasks:
+    - name: Gather facts with timeout
+      setup:
+      async: 30
+      poll: 5
+      ignore_errors: yes
+      
+    - name: Check if Node Exporter binary exists
+      stat:
+        path: "{{ playbook_dir }}/../roles/monitoring/files/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+      delegate_to: localhost
+      register: node_exporter_file
+      run_once: true
+      
+    - name: Node Exporter 바이너리 다운로드 (Local Controller)
+      get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: "{{ playbook_dir }}/../roles/monitoring/files/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+      delegate_to: localhost
+      run_once: true
+      when: not node_exporter_file.stat.exists
+      ignore_errors: yes
+
+    - name: Node Exporter 바이너리 복사 (Controller -> Remote)
+      copy:
+        src: "{{ playbook_dir }}/../roles/monitoring/files/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter.tar.gz
+
+    - name: Node Exporter 압축 해제
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /tmp/
+        remote_src: yes
+      ignore_errors: yes
+
+    - name: Node Exporter 바이너리 설치 (실행 파일 이동)
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        mode: '0755'
+        remote_src: yes
+      ignore_errors: yes
+
+    - name: Node Exporter systemd 서비스 생성 (부팅 시 자동 실행)
+      copy:
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/node_exporter
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/node_exporter.service
+      ignore_errors: yes
+
+    - name: systemd 데몬 리로드 (서비스 등록 인식)
+      systemd:
+        daemon_reload: yes
+      ignore_errors: yes
+
+    - name: Node Exporter 서비스 시작 및 활성화
+      service:
+        name: node_exporter
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: firewalld 서비스 시작 및 활성화
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: 방화벽에서 Node Exporter 포트 열기 (9100/tcp)
+      firewalld:
+        port: 9100/tcp
+        permanent: yes
+        immediate: yes
+        state: enabled
+      ignore_errors: yes
+  tags:
+    - monitoring
+    - node_exporter
+
+# 3단계: 모니터링 서버 방화벽 설정
+- name: 모니터링 서버 방화벽 설정
+  hosts: Monitoring
+  become: yes
+  tasks:
+    - name: Prometheus/Grafana/Alertmanager 포트 열기
+      firewalld:
+        port: "{{ item }}/tcp"
+        permanent: yes
+        immediate: yes
+        state: enabled
+      loop:
+        - 9090  # Prometheus
+        - 3000  # Grafana
+        - 9093  # Alertmanager
+        - 9100  # Node Exporter
+      ignore_errors: yes
+
+    # PC4
+    - name: DB 네트워크(10.2.3.0/24)로 가는 정적 라우팅 추가 (via DB-Proxy VIP)
+      nmcli:
+        conn_name: "eth0"
+        type: ethernet
+        routes4: "10.2.3.0/24 10.2.2.20"
+        state: present
+      ignore_errors: yes
+    
+    - name: DB 네트워크(10.2.3.0/24) 라우팅 확인 및 추가 (ip route)
+      shell: |
+        ip route add 10.2.3.0/24 via 10.2.2.20 dev ens160 || true
+      ignore_errors: yes
+
+# [PC1/DNS] 비대칭 라우팅(Asymmetric Routing) 문제 해결
+# 설명: Monitoring(10.2.2.50) -> DNS(10.2.1.3) 응답 시, WAF(10.2.1.2)를 거치지 않으면 패킷이 유실됨.
+#       따라서 강제로 WAF를 거쳐가도록 정적 라우팅을 추가함.
+- name: DNS 서버 라우팅 설정 (비대칭 라우팅 해결)
+  hosts: DNS
+  become: yes
+  tasks:
+    - name: Monitoring 네트워크(10.2.2.0/24)로 가는 정적 라우팅 추가 (via WAF)
+      nmcli:
+        conn_name: "ens160"
+        type: ethernet
+        routes4: "10.2.2.0/24 10.2.1.2"
+        state: present
+      ignore_errors: yes
+      
+    - name: Monitoring 네트워크(10.2.2.0/24) 라우팅 확인 및 추가 (ip route)
+      shell: |
+        ip route add 10.2.2.0/24 via 10.2.1.2 dev ens160 || true
+      ignore_errors: yes
+
+# [4단계] 외부 접속 설정 (SECURE -> Monitoring 포트 포워딩)
+# 설명: 외부(172.16.6.x)에서 SECURE 서버(172.16.6.61)의 포트로 접속하면,
+#       내부망에 있는 Monitoring 서버(10.2.2.50)로 토스해주는 설정.
+- name: 라우팅 기능 활성화 (SECURE, WAF)
+  hosts: SECURE,WAF
+  become: yes
+  tags: monitoring
+  tasks:
+    - name: IP 포워딩 활성화 (net.ipv4.ip_forward)
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+- name: 외부 접속 설정 (SECURE Port Forwarding)
+  hosts: SECURE
+  become: yes
+  tags: monitoring
+  tasks:
+    # 1. 내부망으로 가는 길 뚫기 (Routing)
+    - name: 내부 네트워크(10.2.2.0/24)로 가는 정적 라우팅 추가 (via WAF) - 영구 적용
+      nmcli:
+        conn_name: "in"
+        type: ethernet
+        routes4: "10.2.2.0/24 10.2.1.2"
+        state: present
+      ignore_errors: yes
+
+    - name: 내부 네트워크(10.2.2.0/24) 라우팅 추가 (via WAF)
+      shell: |
+        ip route add 10.2.2.0/24 via 10.2.1.2 dev ens192 || true
+      ignore_errors: yes
+
+    # 2. NAT 활성화 (외부가 내부로 들어갈 때 주소 변환)
+    - name: 방화벽 Masquerade 활성화
+      ansible.posix.firewalld:
+        masquerade: yes
+        state: enabled
+        permanent: yes
+        immediate: yes
+
+    # 3. 포트 포워딩 규칙 (Port Forwarding)
+    # 3000(Grafana), 9090(Prometheus), 9093(Alertmanager)
+    - name: Grafana 포트 포워딩 (172.16.6.61:3000 -> 10.2.2.50:3000)
+      firewalld:
+        rich_rule: 'rule family="ipv4" forward-port port="3000" protocol="tcp" to-port="3000" to-addr="10.2.2.50"'
+        permanent: yes
+        immediate: yes
+        state: enabled
+
+    - name: Prometheus 포트 포워딩 (172.16.6.61:9090 -> 10.2.2.50:9090)
+      firewalld:
+        rich_rule: 'rule family="ipv4" forward-port port="9090" protocol="tcp" to-port="9090" to-addr="10.2.2.50"'
+        permanent: yes
+        immediate: yes
+        state: enabled
+
+    - name: Alertmanager 포트 포워딩 (172.16.6.61:9093 -> 10.2.2.50:9093)
+      firewalld:
+        rich_rule: 'rule family="ipv4" forward-port port="9093" protocol="tcp" to-port="9093" to-addr="10.2.2.50"'
+        permanent: yes
+        immediate: yes
+        state: enabled

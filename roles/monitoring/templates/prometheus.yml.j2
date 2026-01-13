@@ -1,0 +1,166 @@
+# Prometheus 설정 파일
+# 자동 생성됨 - Ansible
+{% set seen_ips = [] %}
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/alert.rules.yml
+
+scrape_configs:
+  # Prometheus 자체 모니터링
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          nodename: 'PC5-Prometheus'
+
+  # Node Exporter (Dynamic Inventory)
+  
+  # PC1 - Security Tier
+  - job_name: 'security-tier'
+    static_configs:
+{% for host in groups['Security_Tier'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc1'
+          role: 'security'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endfor %}
+
+  # PC2 - K8S Control Plane
+  - job_name: 'k8s-control-plane'
+    static_configs:
+{% for host in groups['K8S_Control_Plane'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc2'
+          role: 'k8s-master'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endfor %}
+
+  # PC3 & PC6 - K8S Workers
+  - job_name: 'k8s-workers'
+    static_configs:
+{% for host in groups['K8S_Workers'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: '{% if host in groups["PC3"] %}pc3{% else %}pc6{% endif %}'
+          role: 'k8s-worker'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endfor %}
+
+  # PC4 - DB Access (Proxies)
+  - job_name: 'db-proxies'
+    static_configs:
+{% for host in groups['DB_Proxies'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc4'
+          role: 'proxy'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endfor %}
+
+  # PC4 - DB Servers & Storage
+  - job_name: 'db-servers'
+    static_configs:
+{% for host in groups['DB_Servers'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc4'
+          role: 'database'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endfor %}
+{% if groups['PC4'] is defined %}
+{% for host in groups['PC4'] %}
+{% if host == 'Storage' %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc4'
+          role: 'storage'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+  # PC4 - etcd Cluster
+  - job_name: 'etcd-cluster'
+    static_configs:
+{% for host in groups['ETCD_Cluster'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc4'
+          role: 'etcd'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endfor %}
+
+  # PC4 - etcd Metrics (etcd-specific metrics on port 2379)
+  - job_name: 'etcd-metrics'
+    static_configs:
+{% for host in groups['ETCD_Cluster'] | default([]) %}
+{% set ip = hostvars[host].ansible_host %}
+      - targets: ['{{ ip }}:2379']
+        labels:
+          tier: 'pc4'
+          role: 'etcd'
+          nodename: '{{ host }}'
+{% endfor %}
+
+  # PC5 - OPS Tier (CI/CD, DR)
+  - job_name: 'ops-tier'
+    static_configs:
+{% for host in groups['OPS_Servers'] | default([]) %}
+{% if host != 'Monitoring' %}
+{% set ip = hostvars[host].ansible_host %}
+{% if ip not in seen_ips %}
+      - targets: ['{{ ip }}:9100']
+        labels:
+          tier: 'pc5'
+          role: 'ops'
+          nodename: '{{ host }}'
+{% set _ = seen_ips.append(ip) %}
+{% endif %}
+{% endif %}
+{% endfor %}
+      # Self-monitoring (Monitoring Server Node Exporter)
+      - targets: ['{{ ansible_host }}:9100']
+        labels:
+          tier: 'pc5'
+          role: 'monitoring'
+          nodename: 'Monitoring'

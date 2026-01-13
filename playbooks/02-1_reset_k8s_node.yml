@@ -1,0 +1,46 @@
+- name: Reset Kubernetes Node
+  hosts: K8S_Cluster
+  become: yes
+  tasks:
+    # 1. K8S 클러스터 설정 초기화 (Master/Worker 공통)
+    - name: Run kubeadm reset
+      command: kubeadm reset -f
+      ignore_errors: yes
+
+    # 2. 관련 서비스 정지
+    - name: Stop kubelet service
+      service:
+        name: kubelet
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+    # 3. 네트워크 설정 파일 삭제 (CNI)
+    - name: Remove CNI config
+      file:
+        path: /etc/cni/net.d
+        state: absent
+
+    # 4. K8S 설정 디렉토리 삭제
+    - name: Cleanup Kubernetes config directory
+      file:
+        path: /etc/kubernetes
+        state: absent
+    
+    # 5. Kubelet 데이터 디렉토리 삭제
+    - name: Cleanup Kubelet lib directory
+      file:
+        path: /var/lib/kubelet
+        state: absent
+        
+    # 6. 사용자 홈 디렉토리의 설정 파일 삭제 (중요: 이것 때문에 에러가 났었음)
+    - name: Cleanup user kubeconfig
+      file:
+        path: /root/.kube
+        state: absent
+
+    # 7. 네트워크 iptables 규칙 초기화 (깨끗한 네트워크 상태)
+    - name: Flush iptables
+      shell: |
+        iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+      ignore_errors: yes

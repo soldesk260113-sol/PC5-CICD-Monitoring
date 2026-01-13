@@ -1,0 +1,12 @@
+---
+- name: 1. NFS 클라이언트 유틸리티 설치 (NAS용)
+  dnf:
+    name: nfs-utils
+    state: present
+
+- name: 2. NAS 스토리지 마운트
+  mount:
+    path: /mnt/nas_shared
+    src: 172.16.6.100:/exports/data  # 실제 NAS IP로 수정 필요
+    fstype: nfs
+    state: mounted

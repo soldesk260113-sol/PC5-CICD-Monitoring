@@ -1,0 +1,49 @@
+---
+- name: 1. Docker 설치 (의존성)
+  include_role:
+    name: docker
+
+- name: 2. Gitea 데이터 디렉토리 생성
+  file:
+    path: /opt/gitea_stack
+    state: directory
+    mode: '0755'
+
+- name: 3. Gitea 데이터 볼륨 디렉토리 생성
+  file:
+    path: /opt/gitea
+    state: directory
+    mode: '0755'
+
+- name: 4. Docker Compose 파일 배포
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/gitea_stack/docker-compose.yml
+    mode: '0644'
+
+- name: 5. Gitea 컨테이너 실행 (Docker Compose)
+  shell: |
+    cd /opt/gitea_stack
+    docker compose down 2>/dev/null || true
+    docker compose up -d
+  register: compose_result
+  changed_when: true
+
+- name: 6. 방화벽 설정 (Gitea Web 3001, SSH 2222)
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    immediate: yes
+    state: enabled
+  loop:
+    - 3001/tcp
+    - 2222/tcp
+
+- name: 7. Gitea 구동 대기 (20초)
+  pause:
+    seconds: 20
+
+- name: 8. Gitea 관리자 계정 생성 (admin / admin123)
+  shell: |
+    docker exec -u 1000 gitea gitea admin user create --username admin --password admin123 --email admin@antigravity.com --admin || true
+  ignore_errors: yes

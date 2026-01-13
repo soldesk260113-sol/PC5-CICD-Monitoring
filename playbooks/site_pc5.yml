@@ -1,0 +1,28 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# PC5 Provisioning (CI-OPS, Monitoring)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 1. Common Setup for All PC5 Nodes
+- name: PC5 Common Setup
+  hosts: PC5
+  become: yes
+  roles:
+    - common
+
+# 2. Monitoring Node (10.2.2.50)
+- name: Monitoring Stack Setup
+  hosts: Monitoring
+  become: yes
+  roles:
+    - monitoring
+
+# 3. CI-OPS Node (10.2.2.40)
+- name: CI/CD & Registry Setup
+  hosts: CI-OPS
+  become: yes
+  roles:
+    # Docker/Base is included in respective roles usually, but ensure common base
+    - jenkins
+    - gitea
+    - harbor

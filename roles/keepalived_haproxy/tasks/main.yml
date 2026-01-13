@@ -1,0 +1,47 @@
+---
+- name: 1. HAProxy와 Keepalived 설치
+  dnf:
+    name:
+      - haproxy
+      - keepalived
+    state: present
+
+- name: 2. HAProxy 설정
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+  notify: restart haproxy
+
+- name: 3. Keepalived 설정
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+  notify: restart keepalived
+
+- name: 1-1. HAProxy LB 포트(6444) 방화벽 허용
+  ansible.posix.firewalld:
+    port: 6444/tcp
+    permanent: yes
+    immediate: yes
+    state: enabled
+  ignore_errors: yes
+
+- name: 1-2. VRRP 프로토콜 허용 (Keepalived)
+  ansible.posix.firewalld:
+    protocol: vrrp
+    permanent: yes
+    immediate: yes
+    state: enabled
+  ignore_errors: yes
+
+- name: 4. HAProxy 서비스 시작
+  service:
+    name: haproxy
+    state: started
+    enabled: yes
+
+- name: 5. Keepalived 서비스 시작
+  service:
+    name: keepalived
+    state: started
+    enabled: yes

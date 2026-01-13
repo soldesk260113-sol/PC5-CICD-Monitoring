@@ -1,0 +1,12 @@
+frontend http-in
+    bind *:80
+    acl is_web path_beg /web
+    acl is_api path_beg /api
+    use_backend web_servers if is_web
+    use_backend api_servers if is_api
+
+backend web_servers
+    server pc2 172.16.6.62:80 check
+
+backend api_servers
+    server pc3 172.16.6.63:8000 check

@@ -1,0 +1,145 @@
+---
+# Prometheus + Grafana 모니터링 스택 설치 (Docker Compose 기반)
+- name: 1. podman-docker 제거 (Docker CE 충돌 방지)
+  dnf:
+    name:
+      - podman-docker
+      - podman
+    state: absent
+  ignore_errors: yes
+
+- name: 2. Docker 리포지토리 추가
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+  ignore_errors: yes
+
+- name: 2. Docker 엔진 설치
+  dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+  ignore_errors: yes
+
+- name: 3. Docker Compose 독립 실행파일 설치
+  get_url:
+    url: https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+  ignore_errors: yes
+
+- name: 4. Docker 서비스 시작
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: 5. 모니터링 디렉토리 생성
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana
+    - /opt/monitoring/alertmanager
+
+- name: 6. Prometheus 설정 파일 배포
+  template:
+    src: prometheus.yml.j2
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    mode: '0644'
+
+- name: 6-1. Prometheus 알림 규칙 배포
+  template:
+    src: alert.rules.yml.j2
+    dest: /opt/monitoring/prometheus/alert.rules.yml
+    mode: '0644'
+
+- name: 7. Alertmanager 설정 파일 배포
+  template:
+    src: alertmanager.yml.j2
+    dest: /opt/monitoring/alertmanager/alertmanager.yml
+    mode: '0644'
+
+- name: 8. Docker Compose 파일 배포
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/monitoring/docker-compose.yml
+    mode: '0644'
+
+- name: 9. Grafana 프로비저닝 디렉토리 생성
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/monitoring/grafana/provisioning
+    - /opt/monitoring/grafana/provisioning/datasources
+    - /opt/monitoring/grafana/provisioning/dashboards
+
+- name: 10. Grafana 데이터소스 설정
+  template:
+    src: grafana-datasource.yml.j2
+    dest: /opt/monitoring/grafana/provisioning/datasources/prometheus.yml
+    mode: '0644'
+
+- name: 10.1. Grafana 대시보드 JSON 복사 (Server Monitoring)
+  copy:
+    src: node_exporter_full.json
+    dest: /opt/monitoring/grafana/provisioning/dashboards/server_monitoring.json
+    mode: '0644'
+
+- name: 10.1-1. Grafana 대시보드 JSON 복사 (etcd Monitoring)
+  copy:
+    src: etcd_dashboard.json
+    dest: /opt/monitoring/grafana/provisioning/dashboards/etcd_monitoring.json
+    mode: '0644'
+
+- name: 10.2. Grafana 대시보드 프로비저닝 설정
+  template:
+    src: grafana-dashboards.yml.j2
+    dest: /opt/monitoring/grafana/provisioning/dashboards/dashboard.yml
+    mode: '0644'
+
+- name: 11. 모니터링 스택 시작
+  shell: |
+    cd /opt/monitoring
+    docker-compose down 2>/dev/null || true
+    docker-compose up -d
+  register: compose_result
+  changed_when: true
+
+- name: 12. 서비스 상태 확인
+  debug:
+    msg: |
+      모니터링 스택이 시작되었습니다!
+      - Prometheus: http://{{ ansible_host }}:{{ prometheus_port | default(9090) }}
+      - Grafana: http://{{ ansible_host }}:{{ grafana_port | default(3000) }}
+      - Alertmanager: http://{{ ansible_host }}:{{ alertmanager_port | default(9093) }}
+
+- name: 13. 메일함 자동 비우기 (Cron Job - 18:00)
+  cron:
+    name: "Clear root mailbox daily 18:00"
+    minute: "0"
+    hour: "18"
+    user: root
+    job: "/usr/bin/truncate -s 0 /var/mail/root"
+    state: present
+
+- name: 14. 메일함 자동 비우기 (Reboot - 부팅 시 즉시 실행)
+  cron:
+    name: "Clear root mailbox on boot"
+    special_time: reboot
+    user: root
+    job: "/usr/bin/truncate -s 0 /var/mail/root"
+    state: present
+
+- name: 15. 기존 Anacron 스크립트 제거 (Cleanup)
+  file:
+    path: /etc/cron.daily/clear-root-mailbox
+    state: absent

@@ -1,0 +1,25 @@
+---
+# Harbor 기본 설정값
+
+# Harbor 호스트명 (CI-OPS 서버)
+harbor_hostname: "{{ ansible_host }}"
+
+# Harbor 포트
+harbor_http_port: 5000
+harbor_https_port: 443
+harbor_https_enabled: false
+
+# Harbor 관리자 비밀번호
+harbor_admin_password: "Admin123"
+
+# Harbor 데이터 디렉토리
+harbor_data_volume: "/data/harbor"
+
+# Harbor 데이터베이스 비밀번호
+harbor_database_password: "HarborDB123"
+
+# Trivy 활성화 (이미지 스캔)
+harbor_trivy_enabled: true
+
+# ChartMuseum 활성화 (Helm Chart 저장소)
+harbor_chartmuseum_enabled: true

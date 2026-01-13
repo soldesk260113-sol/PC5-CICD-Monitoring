@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Global Variables - 모든 호스트에 적용되는 전역 변수 설정
+# ═══════════════════════════════════════════════════════════════════════════
+
+# SSH 연결 설정 (기본 계정과 키 경로)
+ansible_user: root
+ansible_ssh_private_key_file: ~/.ssh/id_rsa
+ansible_python_interpreter: /usr/bin/python3
+
+# 공통 네트워크 설정 (DNS 및 NTP)
+# 모든 서버가 구글 DNS와 타임 서버를 바라보게 함
+dns_servers:
+  - 8.8.8.8
+
+ntp_servers:
+  - time.google.com
+  - time.cloudflare.com
+
+# 공통 패키지
+common_packages:
+  - vim
+  - curl
+  - wget
+  - htop
+  - net-tools
+  - git
+  - jq
+
+# 방화벽 설정
+firewall_enabled: true
+firewall_default_policy: deny
+
+# 모니터링 설정
+node_exporter_port: 9100
+prometheus_server: 10.2.2.50
+
+# 로그 설정
+log_retention_days: 30
+syslog_server: 10.2.2.50
+
+# 타임존
+timezone: Asia/Seoul

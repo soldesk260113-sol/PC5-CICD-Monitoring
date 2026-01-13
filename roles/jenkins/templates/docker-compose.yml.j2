@@ -1,0 +1,19 @@
+version: '3'
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    restart: always
+    user: root
+    environment:
+      - TZ=Asia/Seoul
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Duser.timezone=Asia/Seoul
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - /opt/jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.ssh:/root/.ssh:ro
+      - /usr/bin/docker:/usr/bin/docker
+      - /etc/localtime:/etc/localtime:ro

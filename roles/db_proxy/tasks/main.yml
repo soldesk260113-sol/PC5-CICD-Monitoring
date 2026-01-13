@@ -1,0 +1,55 @@
+---
+# ProxySQL 설치 (PC4 DB 프록시용)
+
+- name: 1. ProxySQL 리포지토리 추가
+  yum_repository:
+    name: proxysql
+    description: ProxySQL YUM Repo
+    baseurl: https://repo.proxysql.com/ProxySQL/proxysql-2.5.x/centos/$releasever/
+    gpgcheck: no
+
+- name: 2. ProxySQL 설치
+  dnf:
+    name: proxysql
+    state: present
+
+- name: 3. ProxySQL 서비스 시작
+  service:
+    name: proxysql
+    state: started
+    enabled: yes
+
+- name: 3.1 Kernel Parameter - ip_nonlocal_bind
+  sysctl:
+    name: net.ipv4.ip_nonlocal_bind
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: 3.2 Firewall - Allow VRRP
+  firewalld:
+    protocol: vrrp
+    permanent: yes
+    immediate: yes
+    state: enabled
+  ignore_errors: yes
+
+- name: 4. Keepalived 설치
+  dnf:
+    name: keepalived
+    state: present
+    update_cache: yes
+
+- name: 5. Keepalived 설정 파일 배포
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0644'
+  notify: restart keepalived
+
+- name: 6. Keepalived 서비스 시작
+  service:
+    name: keepalived
+    state: started
+    enabled: yes

@@ -1,0 +1,15 @@
+# DB Active Node
+ansible_host: 10.2.3.2
+
+nic_count: 1
+nic1_interface: ens160
+nic1_ip_address: 10.2.3.2
+nic1_netmask: 255.255.255.0
+nic1_gateway: 10.2.3.254
+nic1_dns: 8.8.8.8
+
+# SSH ProxyJump via DB-Proxy1
+ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q root@10.2.2.20"'
+
+# Use FW's key for authentication (fetched from FW)
+ansible_ssh_private_key_file: /root/.ssh/id_rsa_fw

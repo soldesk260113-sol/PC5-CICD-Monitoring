@@ -1,0 +1,79 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 05: Deploy CI/CD - Jenkins, Gitea 배포
+# ═══════════════════════════════════════════════════════════════════════════
+- name: CI/CD 서버 구성 (Gitea + Jenkins)
+  hosts: CI-OPS
+  become: yes
+  roles:
+    - gitea
+    - jenkins
+  tags:
+    - cicd
+    - jenkins
+    - gitea
+
+- name: 외부 접속 설정 (SECURE Port Forwarding - Restricted)
+  hosts: SECURE
+  become: yes
+  vars:
+    # 허용할 소스 IP 대역 (Host OS 및 내부망)
+    allow_source_ips:
+      - 172.16.6.0/24
+      - 10.2.0.0/16
+  tasks:
+    - name: 1. IP 포워딩 활성화 (Sysctl)
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: 2. Masquerading 활성화
+      ansible.posix.firewalld:
+        masquerade: yes
+        state: enabled
+        permanent: yes
+        immediate: yes
+        zone: public
+
+    - name: 3. Jenkins 포트 포워딩 (Public Zone)
+      # 설명: 외부(172.16.6.x)에서 오는 트래픽용. 'Public' 존에 적용됨.
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" source address="{{ item }}" forward-port port="8080" protocol="tcp" to-port="8080" to-addr="10.2.2.40"'
+        state: enabled
+        permanent: yes
+        immediate: yes
+        zone: public
+      loop: "{{ allow_source_ips }}"
+
+    - name: 3-1. Jenkins 포트 포워딩 (Trusted Zone) - 내부망 접근용
+      # [중요] Zone Shadowing 해결
+      # 설명: 내부망(10.2.2.x)에서 Gateway로 오면 'Trusted' 존으로 분류됨.
+      # 이때 Public 존의 포워딩 규칙을 타지 않으므로, Trusted 존에도 똑같이 포워딩을 걸어야 함.
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" forward-port port="8080" protocol="tcp" to-port="8080" to-addr="10.2.2.40"'
+        state: enabled
+        permanent: yes
+        immediate: yes
+        zone: trusted
+
+    - name: 4. Gitea 포트 포워딩 (Public Zone)
+      # 설명: 외부 접근용
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" source address="{{ item }}" forward-port port="3001" protocol="tcp" to-port="3001" to-addr="10.2.2.40"'
+        state: enabled
+        permanent: yes
+        immediate: yes
+        zone: public
+      loop: "{{ allow_source_ips }}"
+
+    - name: 4-1. Gitea 포트 포워딩 (Trusted Zone) - 내부망 접근용
+      # 설명: 내부망(PC2, PC3 등) 접근용 (Trusted Zone Shadowing 해결)
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" forward-port port="3001" protocol="tcp" to-port="3001" to-addr="10.2.2.40"'
+        state: enabled
+        permanent: yes
+        immediate: yes
+        zone: trusted

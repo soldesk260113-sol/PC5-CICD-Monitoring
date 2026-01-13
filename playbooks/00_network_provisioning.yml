@@ -1,0 +1,175 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 00: Network Provisioning - IP, Gateway, DNS 설정
+# 설명: host_vars에 정의된 nicX_* 변수를 기반으로 정적 IP를 설정합니다.
+# 주의: 실행 중 네트워크 연결이 끊길 수 있습니다. (설정이 현재와 다를 경우)
+# ═══════════════════════════════════════════════════════════════════════════
+# [Step 0] SSH Key Distribution (Keys must be distributed before connecting to nodes)
+- name: SSH 키 자동 배포 (Script 실행)
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: SSH 배포 스크립트 실행
+      shell: "bash Script/allserver_distribute_sshkeys.sh"
+      args:
+        chdir: "{{ playbook_dir }}/../"
+      register: script_result
+      ignore_errors: yes
+
+    - name: 스크립트 실행 결과 출력
+      debug:
+        msg: "{{ script_result.stdout_lines }}"
+
+# ═══════════════════════════════════════════════════════════════════════════
+- name: 네트워크 인터페이스 프로비저닝
+  hosts: All_Nodes
+  become: yes
+  serial: 2  # 한 번에 2대씩 진행하여 전체 중단 방지
+  tasks:
+    # [1단계] NIC 동적 감지 (서버의 실제 물리 인터페이스 찾기)
+    # 설명: host_vars에 'eth0' 등으로 적혀 있어도, 실제 서버가 'ens160' 등을 쓸 수 있음.
+    #       nmcli로 모든 이더넷 장치를 찾아내어 변수를 덮어씀.
+    - name: 라이브 이더넷 인터페이스 목록 감지 (nmcli)
+      shell: "nmcli -t -f DEVICE,TYPE device | grep 'ethernet' | cut -d: -f1"
+      register: detected_nics
+      changed_when: false
+      ignore_errors: yes
+
+    - name: 감지된 인터페이스로 변수 갱신 (NIC 1 - 주 인터페이스)
+      set_fact:
+        nic1_interface: "{{ detected_nics.stdout_lines[0] }}"
+      when: detected_nics.stdout_lines | length >= 1
+
+    - name: 감지된 인터페이스로 변수 갱신 (NIC 2 - 보조 인터페이스)
+      set_fact:
+        nic2_interface: "{{ detected_nics.stdout_lines[1] }}"
+      when: nic_count|int >= 2 and detected_nics.stdout_lines | length >= 2
+
+    - name: 감지된 인터페이스 확인
+      debug:
+        msg: 
+          - "Found NICs: {{ detected_nics.stdout_lines }}"
+          - "Applied NIC 1: {{ nic1_interface }}"
+          - "Applied NIC 2: {{ nic2_interface | default('None') }}"
+
+    - name: NIC 1 설정 ({{ nic1_interface }})
+      nmcli:
+        conn_name: "{{ nic1_interface }}"
+        ifname: "{{ nic1_interface }}"
+        type: ethernet
+        ip4: "{{ nic1_ip_address }}/24"
+        gw4: "{{ nic1_gateway | default(omit) }}"
+        dns4: "{{ nic1_dns | default(omit) }}"
+        method4: manual
+        state: present
+      when: nic_count|int >= 1 and nic1_interface is defined
+
+    # NIC 2 설정 (존재하는 경우)
+    - name: NIC 2 설정 ({{ nic2_interface | default('none') }})
+      nmcli:
+        conn_name: "{{ nic2_interface }}"
+        ifname: "{{ nic2_interface }}"
+        type: ethernet
+        ip4: "{{ nic2_ip_address }}/24"
+        gw4: "{{ nic2_gateway | default(omit) }}"
+        dns4: "{{ nic2_dns | default(omit) }}"
+        method4: manual
+        state: present
+      when: nic_count|int >= 2 and nic2_interface is defined
+
+    - name: 연결 다시 로드 (NetworkManager)
+      shell: nmcli connection reload
+      ignore_errors: yes
+
+    - name: 인터페이스 상태 확인 (변경 사항 적용)
+      shell: "nmcli connection up {{ nic1_interface }}"
+      ignore_errors: yes
+      async: 10
+      poll: 0
+- name: 외부 통신 설정 (Bridge Network - PC1)
+  hosts: Security_Tier
+  become: yes
+  tasks:
+    - name: 외부 DNS 설정
+      lineinfile:
+        path: /etc/resolv.conf
+        line: "nameserver 8.8.8.8"
+      tags: network
+
+- name: 내부 통신 설정 (HostOnly Network - PC2~6)
+  hosts: PC2:PC3:PC4:PC5:PC6
+  become: yes
+  tasks:
+    - name: 내부 통신 확인
+      ping:
+      tags: network
+
+# [PC1] Security Tier 필수 패키지 자동 프로비저닝
+- name: PC1 (Security Tier) 추가 설정
+  hosts: PC1
+  become: yes
+  tasks:
+    # [Firewall 설정] PC1은 Gateway 역할이므로 내부망 통신 허용 필수
+    - name: 방화벽 서비스 시작 및 활성화 (firewalld)
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+      tags: firewall
+
+    # 중요: 내부망(10.2.2.0/24)을 'Trusted' 존에 추가하여 모든 포트 접근 허용
+    - name: 방화벽 Trusted Zone 소스 추가 (10.2.2.0/24)
+      ansible.posix.firewalld:
+        zone: trusted
+        source: 10.2.2.0/24
+        permanent: yes
+        immediate: yes
+        state: enabled
+      tags: firewall
+
+    # 중요: DB망(10.2.3.0/24)도 'Trusted' 존에 추가
+    - name: 방화벽 Trusted Zone 소스 추가 (10.2.3.0/24)
+      ansible.posix.firewalld:
+        zone: trusted
+        source: 10.2.3.0/24
+        permanent: yes
+        immediate: yes
+        state: enabled
+      tags: firewall
+
+    # 중요: 내부 서버들이 외부 인터넷을 쓸 수 있도록 NAT(Masquerade) 활성화
+    - name: 방화벽 Masquerade 활성화
+      ansible.posix.firewalld:
+        masquerade: yes
+        permanent: yes
+        immediate: yes
+        state: enabled
+      tags: firewall
+
+    - name: SECURE 서버 패키지 설치 (iptables)
+      ansible.builtin.dnf:
+        name:
+          - iptables
+          - iptables-services
+        state: present
+      when: inventory_hostname == 'SECURE'
+      tags: secure_pkg
+
+    - name: DNS 서버 패키지 설치 (bind)
+      ansible.builtin.dnf:
+        name:
+          - bind
+          - bind-utils
+        state: present
+      when: inventory_hostname == 'DNS'
+      tags: dns_pkg
+
+    - name: WAF 서버 패키지 설치 (nginx, modsecurity)
+      ansible.builtin.dnf:
+        name:
+          - nginx
+          - mod_security
+        state: present
+      when: inventory_hostname == 'WAF'
+      tags: waf_pkg

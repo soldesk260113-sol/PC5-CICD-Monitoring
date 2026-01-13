@@ -1,0 +1,13 @@
+Jenkins Pipeline 설정 화면(Configure)에서 'Pipeline' 섹션까지 스크롤.
+Definition: Pipeline script from SCM 선택
+SCM: Git 선택
+Repository URL: http://10.2.2.40:3001/admin/*.git (내부망 주소 사용 권장)
+Credentials: Add -> Jenkins 클릭
+Kind: Username with password
+Username: admin
+Password: admin123
+ID: gitea-auth (이걸 입력해야 Jenkinsfile이랑 매칭됩니다)
+Add 버튼 클릭 후, 드롭다운에서 방금 만든 admin/**** 선택
+Branch Specifier: */master (이미 되어있을 겁니다)
+Script Path: Jenkinsfile (그대로 두세요)
+이렇게 하고 Save -> Build Now 누르시면 됩니다.

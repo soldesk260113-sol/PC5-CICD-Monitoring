@@ -1,0 +1,19 @@
+# etcd Node 3
+# PC4 - Database Layer / etcd Cluster
+
+# 호스트 이름
+hostname: "PC4-etcd_3"
+
+# 네트워크 설정
+network_interface: "ens160"
+ip_address: "10.2.3.22"
+netmask: "255.255.255.0"
+gateway: "10.2.3.1"
+dns_servers:
+  - "10.2.1.3"
+  - "8.8.8.8"
+
+# etcd 클러스터 설정
+etcd_cluster_role: "member"
+etcd_node_name: "etcd-3"
+etcd_initial_cluster: "etcd-1=http://10.2.3.20:2380,etcd-2=http://10.2.3.21:2380,etcd-3=http://10.2.3.22:2380"

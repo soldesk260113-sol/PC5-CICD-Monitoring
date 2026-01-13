@@ -1,0 +1,9 @@
+# K8S Worker Node 5
+ansible_host: 10.2.2.9
+
+nic_count: 1
+nic1_interface: ens160
+nic1_ip_address: 10.2.2.9
+nic1_netmask: 255.255.255.0
+nic1_gateway: 10.2.2.1
+nic1_dns: 8.8.8.8

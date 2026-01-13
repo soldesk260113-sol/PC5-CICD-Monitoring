@@ -1,0 +1,42 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Antigravity Infrastructure - Master Playbook
+# ═══════════════════════════════════════════════════════════════════════════
+# Step 0: 네트워크 프로비저닝 (SSH 키 배포 및 IP/DNS 설정)
+# - SSH Key 배포 (localhost)
+# - 정적 IP 할당 및 네트워크 인터페이스 설정 (nmcli)
+- import_playbook: playbooks/00_network_provisioning.yml
+
+# Step 1: 모든 서버 기초 환경 구축
+# - OS 기본 설정 (NTP, 방화벽, 패키지 등)
+- import_playbook: playbooks/01_common_setup.yml
+
+# Step 2: PC4 데이터베이스 및 스토리지 구축 (Kubernetes 외부 인프라)
+# - MySQL Replication (Master/Slave/Backup)
+# - ProxySQL (DB 로드밸런싱)
+# - Etcd Cluster (Key-Value Store)
+# - NFS Storage 서버 구성
+# - import_playbook: playbooks/04_db_storage_setup.yml
+
+# Step 3: PC2, PC3, PC6 쿠버네티스 클러스터 구축 (초기화 후 설치)
+# - 3-1: 기존 노드 초기화 (Reset) -> 찌꺼기 제거
+- import_playbook: playbooks/02-1_reset_k8s_node.yml
+# - 3-2: 클러스터 구축 (Install) -> Master(PC2) + Worker(PC3, PC6)
+- import_playbook: playbooks/02_k8s_install.yml
+
+# Step 4: 모니터링 시스템 배포
+# - Prometheus, Grafana, Alertmanager 설치
+- import_playbook: playbooks/03_deploy_monitoring.yml
+
+# Step 5: CI/CD 시스템 배포 (PC5)
+# - Jenkins (CI/CD), Gitea (Internal Git)
+- import_playbook: playbooks/05_deploy_cicd.yml
+
+# Step 6: Docker Registry 배포 (PC5)
+# - Harbor (Docker Image Registry)
+- import_playbook: playbooks/06_deploy_registry.yml
+
+# Step 7: ArgoCD 배포 (GitOps CD)
+# - ArgoCD 설치 및 NodePort 노출
+- import_playbook: playbooks/07_deploy_argocd.yml
+

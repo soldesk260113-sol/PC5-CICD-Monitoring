@@ -1,0 +1,63 @@
+---
+- name: 1. Docker 설치 (의존성)
+  include_role:
+    name: docker
+
+- name: 2. Jenkins 스택 디렉토리 생성
+  file:
+    path: /opt/jenkins_stack
+    state: directory
+    mode: '0755'
+
+- name: 3. Jenkins 홈 디렉토리 생성
+  file:
+    path: /opt/jenkins_home
+    state: directory
+    mode: '0777'
+
+- name: 3.1. Jenkins Init 스크립트 디렉토리 생성
+  file:
+    path: /opt/jenkins_home/init.groovy.d
+    state: directory
+    mode: '0777'
+
+- name: 3.2. Jenkins 초기 계정 생성 스크립트 배포
+  template:
+    src: basic-security.groovy.j2
+    dest: /opt/jenkins_home/init.groovy.d/basic-security.groovy
+    mode: '0644'
+
+- name: 4. Docker Compose 파일 배포
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/jenkins_stack/docker-compose.yml
+    mode: '0644'
+
+- name: 5. Jenkins 컨테이너 실행 (Docker Compose)
+  shell: |
+    cd /opt/jenkins_stack
+    docker compose down 2>/dev/null || true
+    docker compose up -d
+  register: compose_result
+  changed_when: true
+
+- name: 6. 호스트에 Git CLI 설치
+  dnf:
+    name: git
+    state: present
+
+- name: 7. 호스트에 Helm CLI 설치
+  shell: |
+    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    chmod 700 get_helm.sh
+    ./get_helm.sh
+    rm -f get_helm.sh
+  args:
+    creates: /usr/local/bin/helm
+
+- name: 8. 방화벽 설정 (Jenkins 8080)
+  firewalld:
+    port: 8080/tcp
+    permanent: yes
+    immediate: yes
+    state: enabled

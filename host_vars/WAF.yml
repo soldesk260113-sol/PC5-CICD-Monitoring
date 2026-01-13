@@ -1,0 +1,16 @@
+# WAF - Web Application Firewall
+# Role: 10.2.1.0 <-> 10.2.2.0 routing
+ansible_host: 10.2.1.2
+
+nic_count: 2
+# eth0 - Inbound from FW
+nic1_interface: ens160
+nic1_ip_address: 10.2.1.2
+nic1_netmask: 255.255.255.0
+nic1_gateway: 10.2.1.1
+nic1_dns: 8.8.8.8
+
+# eth1 - Outbound to K8s/DMZ
+nic2_interface: ens192
+nic2_ip_address: 10.2.2.1
+nic2_netmask: 255.255.255.0

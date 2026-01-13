@@ -1,0 +1,45 @@
+---
+# roles/common/tasks/main.yml
+
+- name: 1. SELinux 비활성화
+  selinux:
+    state: disabled
+
+# [추가] 방화벽 설정을 하기 위해 서비스를 먼저 살립니다.
+- name: 1.5. firewalld 서비스 시작
+  service:
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: 2. 방화벽(firewalld) 필요한 포트 열기
+  firewalld:
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  with_items:
+    - ssh
+    - https
+
+- name: 3. 방화벽에서 ICMP (ping) 허용
+  firewalld:
+    protocol: icmp
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: 4. 방화벽 재시작
+  command: firewall-cmd --reload
+
+- name: 5. 모든 서버에 /etc/hosts 매핑 (Ansible Inventory 기준)
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+    state: present
+  with_items: "{{ groups['all'] }}"
+
+- name: 6. 필수 유틸리티 설치
+  dnf:
+    name: [vim, wget, curl, net-tools]
+    state: present

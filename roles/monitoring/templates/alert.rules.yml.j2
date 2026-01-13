@@ -1,0 +1,31 @@
+{% raw %}
+groups:
+  - name: hardware_alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance, nodename) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 45
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU > 45%"
+          description: "CPU usage on {{ $labels.nodename }} ({{ $labels.instance }}) is above 45% (current value: {{ $value | printf \"%.2f\" }}%)"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 45
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory > 45%"
+          description: "Memory usage on {{ $labels.nodename }} ({{ $labels.instance }}) is above 45% (current value: {{ $value | printf \"%.2f\" }}%)"
+
+      - alert: HighSystemLoad
+        expr: (node_load1 / count without (cpu, mode) (node_cpu_seconds_total{mode="idle"})) * 100 > 45
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Load > 45%"
+          description: "System Load (1m) on {{ $labels.nodename }} ({{ $labels.instance }}) is above 45% of available cores (current value: {{ $value | printf \"%.2f\" }}%)"
+{% endraw %}

@@ -1,0 +1,18 @@
+---
+- name: Fetch Jenkins SSH Key
+  hosts: CI-OPS
+  tasks:
+    - name: Read SSH Key
+      shell: "docker exec jenkins cat /var/jenkins_home/.ssh/id_rsa.pub"
+      register: jenkins_pub_key
+      changed_when: false
+
+- name: Distribute SSH Key
+  hosts: K8S_Cluster
+  become: yes
+  tasks:
+    - name: Add Jenkins SSH Key to authorized_keys
+      authorized_key:
+        user: root
+        state: present
+        key: "{{ hostvars['CI-OPS']['jenkins_pub_key'].stdout }}"

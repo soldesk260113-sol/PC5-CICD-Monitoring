@@ -1,0 +1,37 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 07: Deploy ArgoCD - GitOps CD 도구 설치
+# ═══════════════════════════════════════════════════════════════════════════
+- name: ArgoCD 배포
+  hosts: K8S_Primary_Master
+  become: yes
+  tasks:
+    - name: ArgoCD 네임스페이스 생성
+      shell: kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      
+    - name: ArgoCD 설치 (Manifest)
+      shell: kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      
+    - name: ArgoCD 서버 NodePort 노출 (Patch)
+      shell: |
+        kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort"}}'
+        
+    - name: ArgoCD 초기 비밀번호 확인 방법 안내 (Log)
+      debug:
+        msg: 
+          - "ArgoCD가 설치되었습니다."
+          - "접속 주소: https://10.2.2.2:<NodePort>"
+          - "외부 접속: https://172.16.6.61:<NodePort>"
+          - "NodePort 확인: kubectl get svc -n argocd argocd-server"
+          - "초기 비밀번호: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+
+- name: 외부 접속 허용 (SECURE Gateway 설정)
+  hosts: SECURE
+  become: yes
+  tasks:
+    - name: NodePort 전체 범위 (30000-32767) 포트포워딩 설정
+      shell: |
+        firewall-cmd --permanent --zone=public --add-forward-port=port=30000-32767:proto=tcp:toaddr=10.2.2.2
+        firewall-cmd --permanent --zone=public --add-port=30000-32767/tcp
+        firewall-cmd --reload
+      ignore_errors: yes

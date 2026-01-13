@@ -1,0 +1,14 @@
+# DNS Server
+ansible_host: 10.2.1.3
+
+nic_count: 1
+nic1_interface: ens160
+nic1_ip_address: 10.2.1.3
+nic1_netmask: 255.255.255.0
+nic1_gateway: 10.2.1.1
+
+# SSH ProxyJump via Gateway (10.2.2.1)
+ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q root@10.2.2.1"'
+
+# Use FW's key for authentication
+ansible_ssh_private_key_file: /root/.ssh/id_rsa_fw

@@ -1,0 +1,18 @@
+---
+# Docker 설치 (PC3 API 서버용)
+
+- name: 1. Docker 리포지토리 추가
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+
+- name: 2. Docker 엔진 및 유틸리티 설치
+  dnf:
+    name: [docker-ce, docker-ce-cli, containerd.io, docker-compose-plugin]
+    state: present
+
+- name: 3. Docker 서비스 활성화 및 시작
+  service:
+    name: docker
+    state: started
+    enabled: yes

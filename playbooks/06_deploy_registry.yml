@@ -1,0 +1,14 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Playbook 06: Docker Registry (Harbor) 배포
+# ═══════════════════════════════════════════════════════════════════════════
+- name: Harbor Docker Registry 설치
+  # 설명: CI/CD 파이프라인을 위한 내부 Docker 이미지 저장소 구축
+  hosts: CI-OPS
+  become: yes
+  roles:
+    - harbor
+  tags:
+    - harbor
+    - registry
+    - cicd
