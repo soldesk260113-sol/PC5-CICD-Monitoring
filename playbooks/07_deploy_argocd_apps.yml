@@ -10,7 +10,7 @@
     #   상위 메타 애플리케이션을 배포합니다.
     - name: Copy argocd_apps.yaml to Master Node
       copy:
-        src: /root/Antigravity/Ansible/k8s_manifests/argocd/argocd_apps.yaml
+        src: "{{ playbook_dir }}/../k8s_manifests/argocd/argocd_apps.yaml"
         dest: /root/argocd_apps.yaml
 
     - name: Apply ArgoCD Applications (동기화 시작)
