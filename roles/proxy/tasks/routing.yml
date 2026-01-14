@@ -31,8 +31,8 @@
 - name: Allow forwarding between zones by setting both NICs to trusted (simple & robust)
   ansible.builtin.shell: |
     set -e
-    firewall-cmd --permanent --zone=trusted --add-interface={{ proxy_external_iface }}
-    firewall-cmd --permanent --zone=trusted --add-interface={{ proxy_internal_iface }}
+    firewall-cmd --permanent --zone=trusted --add-interface={{ proxy_nat_external_if | default('ens160') }}
+    firewall-cmd --permanent --zone=trusted --add-interface={{ nic2_interface | default('ens192') }}
     firewall-cmd --permanent --zone=trusted --add-service=ssh
   args:
     executable: /bin/bash

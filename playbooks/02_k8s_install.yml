@@ -9,6 +9,8 @@
 - name: K8s 클러스터 공통 설정
   hosts: K8S_Cluster
   become: yes
+  pre_tasks:
+    - import_tasks: tasks/detect_nics.yml
   roles:
     - k8s_base
   tags:
@@ -23,6 +25,8 @@
 - name: K8S Control Plane HA 구성 (Keepalived + HAProxy)
   hosts: K8S_Control_Plane
   become: yes
+  pre_tasks:
+    - import_tasks: tasks/detect_nics.yml
   roles:
     - keepalived_haproxy
   tags:

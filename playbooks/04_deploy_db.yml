@@ -11,6 +11,8 @@
   become: true
 
   pre_tasks:
+    - import_tasks: tasks/detect_nics.yml
+
     - name: Load proxy non-secret vars
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../group_vars/proxy/main.yml"

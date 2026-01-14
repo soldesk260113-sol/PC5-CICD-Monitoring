@@ -1,0 +1,30 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Task: Dynamic NIC Detection (nmcli)
+# ═══════════════════════════════════════════════════════════════════════════
+# 설명: 서버의 실제 활성 이더넷 인터페이스를 감지하여 host_vars를 덮어씁니다.
+# 목적: 하드웨어 이름(eth0, ens160 등)이 변경되어도 Playbook이 정상 작동하도록 보장.
+
+- name: 라이브 이더넷 인터페이스 목록 감지 (nmcli)
+  shell: "nmcli -t -f DEVICE,TYPE device | grep 'ethernet' | cut -d: -f1 | sort"
+  register: detected_nics_dynamic
+  changed_when: false
+  ignore_errors: yes
+  become: yes
+
+- name: 감지된 인터페이스로 변수 갱신 (Dynamic NIC 1)
+  set_fact:
+    nic1_interface: "{{ detected_nics_dynamic.stdout_lines[0] }}"
+  when: detected_nics_dynamic.stdout_lines | length >= 1
+
+- name: 감지된 인터페이스로 변수 갱신 (Dynamic NIC 2 - Optional)
+  set_fact:
+    nic2_interface: "{{ detected_nics_dynamic.stdout_lines[1] }}"
+  when: detected_nics_dynamic.stdout_lines | length >= 2
+
+- name: Dynamic NIC 감지 결과 출력
+  debug:
+    msg: 
+      - "Detected Physical NICs: {{ detected_nics_dynamic.stdout_lines }}"
+      - "Active NIC 1: {{ nic1_interface | default('UNKNOWN') }}"
+      - "Active NIC 2: {{ nic2_interface | default('NONE') }}"

@@ -4,7 +4,7 @@ global_defs {
 
 vrrp_instance VI_1 {
     state {{ 'MASTER' if inventory_hostname == 'Monitoring' else 'BACKUP' }}
-    interface ens160
+    interface {{ nic1_interface | default('ens160') }}
     virtual_router_id 51
     priority {{ '150' if inventory_hostname == 'Monitoring' else '100' }}
     advert_int 1

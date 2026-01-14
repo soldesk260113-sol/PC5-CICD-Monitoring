@@ -8,6 +8,8 @@
 - name: Configure SECURE Gateway (Firewall & Routing)
   hosts: SECURE
   become: true
+  pre_tasks:
+    - import_tasks: tasks/detect_nics.yml
   roles:
     - secure
 
@@ -17,6 +19,8 @@
 - name: Configure WAF (Web Application Firewall)
   hosts: WAF
   become: true
+  pre_tasks:
+    - import_tasks: tasks/detect_nics.yml
   roles:
     - waf
 

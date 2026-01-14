@@ -8,10 +8,9 @@
       설계 문서에는 DB IP가 없으므로 임의로 채우지 않았습니다.
       group_vars/proxy/main.yml의 db_nodes에 DB-A/DB-S/DB-B 실제 IP를 넣고 재실행하세요.
 
-- name: Ensure interfaces are set as per design
+- name: Ensure interfaces match detected hardware
   ansible.builtin.assert:
     that:
-      - proxy_external_iface == 'ens160'
-      - proxy_internal_iface == 'ens192'
-    fail_msg: "설계 문서 기준: 외부=ens160, 내부=ens192 입니다. main.yml 값을 확인하세요."
+      - proxy_nat_external_if == nic1_interface
+    fail_msg: "설정 오류: 설정된 외부 인터페이스({{ proxy_nat_external_if }})가 감지된 하드웨어({{ nic1_interface }})와 다릅니다. defaults/main.yml을 확인하세요."
 
