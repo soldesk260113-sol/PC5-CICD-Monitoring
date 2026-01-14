@@ -1,0 +1,2 @@
+{{ pg_primary_host }}:{{ pg_primary_port | default(5432) }}:*:{{ pg_backup_db_user | default('postgres') }}:{{ pg_backup_db_password }}
+

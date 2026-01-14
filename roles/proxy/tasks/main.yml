@@ -1,0 +1,19 @@
+- import_tasks: iptables.yml
+
+- name: Validate required variables
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Install packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Configure routing (ip_forward) and forwarding policy
+  ansible.builtin.import_tasks: routing.yml
+
+# ✅ VIP 먼저
+- name: Configure Keepalived (Dual VIP failover)
+  ansible.builtin.import_tasks: keepalived.yml
+
+# ✅ VIP 이후
+- name: Configure HAProxy (PostgreSQL L4 + Patroni master check)
+  ansible.builtin.import_tasks: haproxy.yml
+

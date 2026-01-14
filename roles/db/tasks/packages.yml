@@ -1,0 +1,19 @@
+---
+- name: Install base packages
+  dnf:
+    name:
+      - vim
+      - curl
+      - jq
+      - rsync
+      - chrony
+      - policycoreutils-python-utils
+      - firewalld
+    state: present
+
+- name: Enable and start chronyd
+  service:
+    name: chronyd
+    state: started
+    enabled: true
+

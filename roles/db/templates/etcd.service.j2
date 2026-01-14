@@ -1,0 +1,16 @@
+[Unit]
+Description=etcd
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=etcd
+ExecStart=/usr/local/bin/etcd --config-file=/etc/etcd/etcd.conf
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,39 @@
+- name: Set keepalived state/priority
+  ansible.builtin.set_fact:
+    keepalived_state: "{{ 'MASTER' if inventory_hostname == 'DB-Proxy1' else 'BACKUP' }}"
+    keepalived_priority: "{{ 150 if inventory_hostname == 'DB-Proxy1' else 100 }}"
+
+- name: Install HAProxy health-check script for keepalived
+  ansible.builtin.template:
+    src: check_haproxy.sh.j2
+    dest: /usr/local/bin/check_haproxy.sh
+    mode: "0755"
+  notify: restart keepalived
+
+- name: Render keepalived.conf (dual VIP)
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: "0644"
+  notify: restart keepalived
+
+- name: Start keepalived
+  ansible.builtin.service:
+    name: keepalived
+    state: started
+- name: Render keepalived.conf (dual VIP)
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: "0644"
+  notify: restart keepalived
+
+- name: Assert keepalived.conf contains our VIPs
+  ansible.builtin.shell: |
+    set -e
+    grep -q "{{ proxy_external_vip }}" /etc/keepalived/keepalived.conf
+    grep -q "{{ proxy_internal_vip }}" /etc/keepalived/keepalived.conf
+  args:
+    executable: /bin/bash
+  changed_when: false
+

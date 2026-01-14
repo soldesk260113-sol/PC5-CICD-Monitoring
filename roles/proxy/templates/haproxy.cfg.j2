@@ -1,0 +1,31 @@
+global
+    daemon
+    maxconn 4096
+    log /dev/log local0
+
+defaults
+    mode tcp
+    log global
+    option tcplog
+    timeout connect 5s
+    timeout client  1m
+    timeout server  1m
+
+frontend fe_pg
+    bind :{{ haproxy_listen_port }}
+
+    default_backend be_pg_primary
+
+backend be_pg_primary
+    balance first
+    option tcp-check
+
+    # Patroni REST(/master)로 primary 여부 확인
+    tcp-check connect port {{ patroni_rest_port }}
+    tcp-check send "GET {{ patroni_master_path }} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    tcp-check expect rstring "200 OK"
+
+{% for n in db_nodes %}
+    server {{ n.name }} {{ n.host }}:{{ n.pg_port | default(5432) }} check port {{ n.patroni_port | default(patroni_rest_port) }} inter 2s fall 2 rise 2
+{% endfor %}
+

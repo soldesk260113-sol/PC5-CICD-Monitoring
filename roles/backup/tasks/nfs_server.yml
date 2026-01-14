@@ -1,0 +1,54 @@
+- name: Install firewalld (RHEL)
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Enable and start firewalld (RHEL)
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+  when: ansible_os_family == "RedHat"
+
+
+- name: Install NFS server packages
+  package:
+    name: nfs-utils
+    state: present
+
+- name: Enable and start rpcbind and nfs-server
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - rpcbind
+    - nfs-server
+
+- name: Open NFS related firewall services
+  firewalld:
+    service: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - nfs
+    - mountd
+    - rpc-bind
+
+- name: Create export directory
+  file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    mode: '0777'
+
+- name: Configure /etc/exports
+  lineinfile:
+    path: /etc/exports
+    line: "{{ nfs_export_path }} 10.2.3.4(rw,sync,no_subtree_check)"
+    create: yes
+
+- name: Reload NFS exports
+  command: exportfs -ra
+

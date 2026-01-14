@@ -1,0 +1,50 @@
+---
+# roles/db/tasks/postgres.yml
+# - PostgreSQL OS 패키지/디렉토리/권한 준비
+# - initdb는 Patroni가 수행 (여기서 하지 않음)
+# - DB-S 복제용 .pgpass를 미리 준비 (pg_basebackup에서 사용)
+
+- name: Install PostgreSQL server packages
+  ansible.builtin.dnf:
+    name:
+      - postgresql-server
+      - postgresql
+      - postgresql-contrib
+    state: present
+
+- name: Ensure postgresql service is stopped/disabled (Patroni will manage postgres)
+  ansible.builtin.service:
+    name: postgresql
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+# Patroni가 사용할 데이터/로그 디렉토리 (vars에서 정의되어 있어야 함)
+# 예) patroni_pg_data_dir: /var/lib/pgsql/patroni
+# 예) patroni_pg_log_dir:  /var/log/postgresql (원하는 경로)
+- name: Ensure Patroni PostgreSQL data directory exists
+  ansible.builtin.file:
+    path: "{{ patroni_pg_data_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+
+- name: Ensure PostgreSQL log directory exists
+  ansible.builtin.file:
+    path: "{{ patroni_pg_log_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0755"
+
+# pgpass는 pg_basebackup에서 사용됨. DB-S에서만 필요.
+- name: Create .pgpass file for replication (DB-S only)
+  ansible.builtin.template:
+    src: pgpass.j2
+    dest: /var/lib/pgsql/pgpass
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  when: inventory_hostname == 'DB-Standby'
+

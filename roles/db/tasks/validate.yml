@@ -1,0 +1,38 @@
+---
+- name: Validate default route exists
+  ansible.builtin.command: ip route
+  register: ip_route
+  changed_when: false
+
+- name: Show routes
+  ansible.builtin.debug:
+    msg: "{{ ip_route.stdout_lines }}"
+
+# etcdctl 바이너리 존재 여부 확인 (바이너리 배포 기준: /usr/local/bin/etcdctl)
+- name: Check etcdctl exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/etcdctl
+  register: etcdctl_bin
+  changed_when: false
+  when: inventory_hostname in ['DB-Active', 'DB-Standby', 'DB-Backup']
+
+# etcd는 DB-Active/DB-Standby/DB-Backup 3노드 고정 (설계 기준)
+- name: Validate etcd health (from each node) - DB-Active/DB-Standby/DB-Backup only
+  ansible.builtin.command: >
+    /usr/local/bin/etcdctl endpoint health
+    --endpoints=http://10.2.3.2:{{ etcd_client_port }},http://10.2.3.3:{{ etcd_client_port }},http://10.2.3.4:{{ etcd_client_port }}
+  environment:
+    ETCDCTL_API: "3"
+  register: etcd_health
+  changed_when: false
+  when:
+    - inventory_hostname in ['DB-Active', 'DB-Standby', 'DB-Backup']
+    - etcdctl_bin.stat.exists
+
+- name: Show etcd health result
+  ansible.builtin.debug:
+    msg: "{{ etcd_health.stdout_lines | default([]) }}"
+  when:
+    - inventory_hostname in ['DB-Active', 'DB-Standby', 'DB-Backup']
+    - etcdctl_bin.stat.exists
+

@@ -1,0 +1,115 @@
+---
+# roles/db/tasks/patroni.yml
+# - Patroni 설치(pip)
+# - patroni.yml 렌더링
+# - systemd unit 렌더링
+# - patroni 기동
+
+- name: Install Patroni dependencies
+  ansible.builtin.dnf:
+    name:
+      - python3-pip
+      - python3-psycopg2
+      - gcc
+      - python3-devel
+      - libpq-devel
+      - curl
+    state: present
+
+- name: Upgrade pip tooling
+  ansible.builtin.pip:
+    name:
+      - pip
+      - setuptools
+      - wheel
+    executable: pip3
+    state: latest
+
+# v2 client 제거 (Patroni가 실수로 etcd v2로 붙는 경우 방지)
+- name: Remove python-etcd (v2 client) if present
+  ansible.builtin.pip:
+    name:
+      - python-etcd
+      - etcd
+    executable: pip3
+    state: absent
+  ignore_errors: true
+
+# Patroni(etcd3) 설치
+- name: Install Patroni with etcd3 support
+  ansible.builtin.pip:
+    name:
+      - "patroni[etcd3]"
+      - "etcd3"
+      - "grpcio"
+      - "protobuf"
+    executable: pip3
+    state: latest
+
+# patroni.yml 렌더링 (postgres가 읽을 수 있어야 함)
+- name: Ensure /etc/patroni.yml permissions (readable by postgres)
+  ansible.builtin.file:
+    path: /etc/patroni.yml
+    state: touch
+    owner: root
+    group: postgres
+    mode: "0640"
+
+- name: Render patroni config
+  ansible.builtin.template:
+    src: patroni.yml.j2
+    dest: /etc/patroni.yml
+    owner: root
+    group: postgres
+    mode: "0640"
+
+# systemd unit (템플릿 사용 권장: templates/patroni.service.j2)
+- name: Render systemd unit for patroni
+  ansible.builtin.template:
+    src: patroni.service.j2
+    dest: /etc/systemd/system/patroni.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart patroni
+
+- name: systemd daemon-reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start patroni (DB-Active, DB-Standby only)
+  ansible.builtin.systemd:
+    name: patroni
+    state: started
+    enabled: true
+  when: inventory_hostname in ['DB-Active', 'DB-Standby']
+
+# 디버깅-friendly: active 아니면 로그 뽑고 fail
+- name: Check patroni service is active (DB-Active, DB-Standby only)
+  ansible.builtin.command: systemctl is-active patroni
+  register: patroni_active
+  changed_when: false
+  failed_when: false
+  when: inventory_hostname in ['DB-Active', 'DB-Standby']
+
+- name: Dump patroni journal (DB-Active, DB-Standby only)
+  ansible.builtin.command: journalctl -u patroni -n 200 --no-pager
+  register: patroni_journal
+  changed_when: false
+  failed_when: false
+  when: inventory_hostname in ['DB-Active', 'DB-Standby']
+
+- name: Fail if patroni is not active (DB-Active, DB-Standby only)
+  ansible.builtin.fail:
+    msg: |
+      Patroni is not active on {{ inventory_hostname }}.
+      is-active: {{ patroni_active.stdout | default('') }}
+
+      --- journalctl -u patroni (last 200) ---
+      {{ patroni_journal.stdout | default('') }}
+  when:
+    - inventory_hostname in ['DB-Active', 'DB-Standby']
+    - patroni_active.stdout != "active"
+

@@ -1,0 +1,31 @@
+---
+- name: Ensure IPv4 forwarding disabled on DB nodes (default)
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "0"
+    state: present
+    reload: true
+
+- name: Get active connection name for first ens* device
+  ansible.builtin.shell: |
+    nmcli -t -f NAME,DEVICE con show --active | awk -F: '$2 ~ /^ens/ {print $1; exit}'
+  args:
+    executable: /bin/bash
+  register: nmcli_active_con
+  changed_when: false
+
+- name: Fail if active connection name not found
+  ansible.builtin.fail:
+    msg: "No active NetworkManager connection found for ens* on {{ inventory_hostname }}. Check nmcli con show --active."
+  when: nmcli_active_con.stdout | trim == ""
+
+- name: Set default gateway to Proxy internal VIP (10.2.3.254)
+  community.general.nmcli:
+    conn_name: "{{ nmcli_active_con.stdout | trim }}"
+    gw4: "{{ db_gateway_vip }}"
+    state: present
+
+- name: Bring connection up
+  ansible.builtin.command: nmcli con up "{{ nmcli_active_con.stdout | trim }}"
+  changed_when: false
+

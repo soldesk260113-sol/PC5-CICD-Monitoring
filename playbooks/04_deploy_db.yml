@@ -1,0 +1,70 @@
+---
+- name: Build Proxy (HA / LB / Router)
+  hosts: DB_Proxies
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Load proxy non-secret vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/proxy/main.yml"
+
+    - name: Load proxy secret vars (vault)
+      ansible.builtin.include_vars:
+        file: "{{ proxy_vault_vars_file }}"
+
+  roles:
+    - proxy
+
+- name: Build DB (etcd)
+  hosts: ETCD_Cluster
+  gather_facts: true
+  become: true
+  pre_tasks:
+    - name: Load DB non-secret vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/db/main.yml"
+
+    - name: Load DB secret vars (vault)
+      ansible.builtin.include_vars:
+        file: "{{ db_vault_vars_file }}"
+
+
+  tasks:
+    - import_role:
+        name: db
+        tasks_from: etcd.yml
+      tags: ['etcd']
+
+
+- name: Build DB (PostgreSQL / Patroni / etcd / Backup)
+  hosts: DB_Servers
+  serial: 1
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Load DB non-secret vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/db/main.yml"
+
+    - name: Load DB secret vars (vault)
+      ansible.builtin.include_vars:
+        file: "{{ db_vault_vars_file }}"
+
+  roles:
+    - db
+
+- hosts: DB-Backup, Storage
+  become: true
+  pre_tasks:
+    - name: Load DB non-secret vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/db/main.yml"
+
+    - name: Load DB secret vars (vault)
+      ansible.builtin.include_vars:
+        file: "{{ db_vault_vars_file }}"
+
+  roles:
+    - backup

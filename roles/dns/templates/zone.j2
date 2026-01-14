@@ -1,0 +1,16 @@
+$TTL 300
+@ IN SOA dns.{{ zone_name }}. admin.{{ zone_name }}. (
+  {{ serial }}
+  3600
+  900
+  604800
+  300
+)
+
+  IN NS dns.{{ zone_name }}.
+dns IN A {{ dns_ip }}
+
+{% for r in records %}
+{{ r.name }} IN A {{ r.ip }}
+{% endfor %}
+

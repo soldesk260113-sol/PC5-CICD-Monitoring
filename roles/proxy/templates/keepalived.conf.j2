@@ -1,0 +1,37 @@
+global_defs {
+  router_id {{ inventory_hostname }}
+  enable_script_security
+  script_user root
+}
+
+vrrp_script chk_haproxy {
+  script "/usr/local/bin/check_haproxy.sh"
+  interval 2
+  timeout 1
+  rise 2
+  fall 3
+}
+
+vrrp_instance VI_PROXY {
+  state {{ keepalived_state }}
+  interface {{ proxy_external_iface }}
+  virtual_router_id {{ vrrp_router_id }}
+  priority {{ keepalived_priority }}
+  advert_int 1
+
+  authentication {
+    auth_type PASS
+    auth_pass {{ vrrp_auth_pass }}
+  }
+
+  # VIP 2개: 외부 서비스 VIP + 내부 GW VIP
+  virtual_ipaddress {
+    {{ proxy_external_vip }}/{{ proxy_external_vip_cidr }} dev {{ proxy_external_iface }}
+    {{ proxy_internal_vip }}/{{ proxy_internal_vip_cidr }} dev {{ proxy_internal_iface }}
+  }
+
+  track_script {
+    chk_haproxy
+  }
+}
+

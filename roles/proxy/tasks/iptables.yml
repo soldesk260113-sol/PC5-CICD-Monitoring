@@ -1,0 +1,70 @@
+---
+- name: Install required packages (iptables-services)
+  ansible.builtin.dnf:
+    name:
+      - iptables-services
+      - iptables
+    state: present
+  when: proxy_nat_use_iptables_services | bool
+
+- name: Enable IPv4 forwarding (runtime, persistent)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: true
+
+# (선택) rp_filter 완화: 멀티 NIC 라우터 환경에서 역경로 필터가 방해하면 통신이 끊길 수 있어 0으로 둠
+- name: Disable rp_filter (avoid asymmetric routing drops)
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "0"
+    state: present
+    reload: true
+  loop:
+    - net.ipv4.conf.all.rp_filter
+    - net.ipv4.conf.default.rp_filter
+
+- name: Deploy /etc/sysconfig/iptables
+  ansible.builtin.template:
+    src: iptables.j2
+    dest: /etc/sysconfig/iptables
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart iptables
+  when: proxy_nat_use_iptables_services | bool
+
+- name: Ensure iptables service enabled and started
+  ansible.builtin.service:
+    name: iptables
+    state: started
+    enabled: true
+  when: proxy_nat_use_iptables_services | bool
+
+# IPv6는 안 쓰는 환경이면 ip6tables는 없어도 됨. 있으면 같이 켜고 싶을 때만 사용.
+- name: Ensure ip6tables service enabled and started (optional)
+  ansible.builtin.service:
+    name: ip6tables
+    state: started
+    enabled: true
+  ignore_errors: true
+  when: proxy_nat_use_iptables_services | bool
+
+# 검증(변경 없음으로 처리)
+- name: Check NAT rule (POSTROUTING)
+  ansible.builtin.command: iptables -t nat -S POSTROUTING
+  register: nat_postrouting
+  changed_when: false
+
+- name: Check FORWARD rules
+  ansible.builtin.command: iptables -S FORWARD
+  register: filter_forward
+  changed_when: false
+
+- name: Show iptables summary
+  ansible.builtin.debug:
+    msg:
+      - "POSTROUTING rules: {{ nat_postrouting.stdout }}"
+      - "FORWARD rules: {{ filter_forward.stdout }}"
+

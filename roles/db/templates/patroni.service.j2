@@ -1,0 +1,32 @@
+[Unit]
+Description=Patroni PostgreSQL HA Cluster
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Patroni는 반드시 postgres 유저로 실행
+User=postgres
+Group=postgres
+
+# Patroni 실행 파일 경로 (pip 설치 기준)
+ExecStart=/usr/local/bin/patroni /etc/patroni.yml
+
+# 장애 시 재시작
+Restart=on-failure
+RestartSec=5
+
+# 파일 디스크립터 한도 (PostgreSQL 권장값)
+LimitNOFILE=65536
+
+# 종료 시 SIGTERM → PostgreSQL 정상 종료
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+# systemd가 Patroni 상태를 오판하지 않게
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+

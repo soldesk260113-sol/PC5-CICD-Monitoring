@@ -1,0 +1,24 @@
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# 이미 연결된 트래픽은 허용
+-A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 내부망 -> 외부망 포워딩 허용
+-A FORWARD -s {{ proxy_nat_internal_cidr }} -o {{ proxy_nat_external_if }} -j ACCEPT
+
+COMMIT
+
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# 내부망 출발 트래픽을 외부 NIC로 나갈 때 MASQUERADE
+-A POSTROUTING -s {{ proxy_nat_internal_cidr }} -o {{ proxy_nat_external_if }} -j MASQUERADE
+
+COMMIT
+

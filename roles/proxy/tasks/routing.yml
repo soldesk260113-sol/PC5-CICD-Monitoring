@@ -1,0 +1,45 @@
+- name: Enable ip_forward (net.ipv4.ip_forward=1)
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.d/99-proxy-router.conf
+    create: true
+    mode: "0644"
+    line: "net.ipv4.ip_forward = 1"
+  when: proxy_enable_ip_forward
+  notify: reload sysctl
+
+# CentOS Stream 9 기본 firewalld 환경에서 라우팅/포워딩 막히는 경우가 많아 선제 처리
+- name: Ensure firewalld is present (if configuring forward)
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+  when: proxy_configure_firewalld_forward
+
+- name: Ensure firewalld running (if configuring forward)
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+  when: proxy_configure_firewalld_forward
+
+- name: Allow masquerade OFF (routing only) - keep default (no NAT)
+  ansible.builtin.command: firewall-cmd --permanent --remove-masquerade
+  register: _fw_masq_rm
+  failed_when: false
+  changed_when: "'success' in _fw_masq_rm.stdout | default('')"
+  when: proxy_configure_firewalld_forward
+
+- name: Allow forwarding between zones by setting both NICs to trusted (simple & robust)
+  ansible.builtin.shell: |
+    set -e
+    firewall-cmd --permanent --zone=trusted --add-interface={{ proxy_external_iface }}
+    firewall-cmd --permanent --zone=trusted --add-interface={{ proxy_internal_iface }}
+    firewall-cmd --permanent --zone=trusted --add-service=ssh
+  args:
+    executable: /bin/bash
+  when: proxy_configure_firewalld_forward
+
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
+  when: proxy_configure_firewalld_forward
+  changed_when: true
+

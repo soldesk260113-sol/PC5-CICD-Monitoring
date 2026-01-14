@@ -1,0 +1,30 @@
+---
+# roles/db/tasks/main.yml
+
+- import_tasks: packages.yml
+- import_tasks: network.yml
+- import_tasks: firewall.yml
+
+# -------------------------------
+# ETCD nodes only
+# -------------------------------
+- import_tasks: etcd.yml
+  when: inventory_hostname in groups.get('etcd', [])
+
+# -------------------------------
+# DB nodes only (PostgreSQL/Patroni)
+# -------------------------------
+- import_tasks: postgres.yml
+  when: inventory_hostname in groups.get('db', [])
+
+- import_tasks: patroni.yml
+  when: inventory_hostname in groups.get('db', [])
+
+
+# (선택) 기타 구성들
+- import_tasks: pgbackrest.yml
+  when: inventory_hostname in groups.get('db', [])
+
+- import_tasks: validate.yml
+  when: inventory_hostname in groups.get('db', [])
+

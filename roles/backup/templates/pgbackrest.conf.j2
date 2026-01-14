@@ -1,0 +1,13 @@
+[global]
+repo1-path={{ local_mount_path }}
+repo1-retention-full={{ pgbackrest_retention_full | default(7) }}
+start-fast=y
+process-max=2
+log-level-console=info
+
+[{{ pgbackrest_stanza }}]
+pg1-host={{ pg_primary_host }}
+pg1-port={{ pg_primary_port | default(5432) }}
+pg1-path={{ pg_primary_data_path | default('/var/lib/pgsql/data') }}
+pg1-user={{ pg_backup_db_user | default('postgres') }}
+

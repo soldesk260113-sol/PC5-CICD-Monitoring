@@ -1,0 +1,17 @@
+- name: Ensure db_nodes is provided
+  ansible.builtin.assert:
+    that:
+      - db_nodes is defined
+      - db_nodes | length >= 1
+    fail_msg: >-
+      db_nodes가 비어 있습니다.
+      설계 문서에는 DB IP가 없으므로 임의로 채우지 않았습니다.
+      group_vars/proxy/main.yml의 db_nodes에 DB-A/DB-S/DB-B 실제 IP를 넣고 재실행하세요.
+
+- name: Ensure interfaces are set as per design
+  ansible.builtin.assert:
+    that:
+      - proxy_external_iface == 'ens160'
+      - proxy_internal_iface == 'ens192'
+    fail_msg: "설계 문서 기준: 외부=ens160, 내부=ens192 입니다. main.yml 값을 확인하세요."
+

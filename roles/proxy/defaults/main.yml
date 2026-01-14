@@ -1,0 +1,13 @@
+---
+# 내부망 CIDR
+proxy_nat_internal_cidr: "10.2.3.0/24"
+
+# 외부 NIC 이름 (Proxy에서 외부로 나가는 인터페이스)
+proxy_nat_external_if: "ens160"
+
+# 내부 NIC 이름 (선택: 명시하고 싶으면 사용)
+# proxy_nat_internal_if: "ens192"
+
+# iptables-services 사용 여부 (RHEL/Rocky/Alma 권장)
+proxy_nat_use_iptables_services: true
+

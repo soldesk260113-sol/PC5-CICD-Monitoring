@@ -1,0 +1,23 @@
+---
+- name: Deploy backup script
+  ansible.builtin.template:
+    src: db_backup.sh.j2
+    dest: /usr/local/bin/db_backup.sh
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Ensure log file exists
+  ansible.builtin.file:
+    path: /var/log/db_backup.log
+    state: touch
+    mode: "0644"
+
+- name: Register daily backup cron
+  ansible.builtin.cron:
+    name: "DB Full Backup (pgBackRest) + etcd snapshot"
+    minute: "{{ backup_cron_minute | default('10') }}"
+    hour: "{{ backup_cron_hour | default('2') }}"
+    user: root
+    job: "/usr/local/bin/db_backup.sh"
+

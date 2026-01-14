@@ -1,0 +1,83 @@
+---
+- name: Ensure firewalld installed
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+
+- name: Ensure firewalld running
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Detect default firewalld zone
+  ansible.builtin.command: firewall-cmd --get-default-zone
+  register: fw_default_zone
+  changed_when: false
+
+# ------------------------------------------------------------
+# PostgreSQL / Patroni 인바운드 허용
+# - DB-S가 DB-A로 pg_basebackup(5432) 못 붙어서 부트스트랩 실패하던 문제 해결 핵심
+# - DB 노드 간 + svc_subnet(Proxy/서비스)에서 접속 필요하면 5432 허용
+# ------------------------------------------------------------
+- name: Allow PostgreSQL/Patroni ports from allowed source CIDRs (rich rules)
+  ansible.posix.firewalld:
+    zone: "{{ fw_default_zone.stdout }}"
+    rich_rule: >
+      rule family="ipv4"
+      source address="{{ item.1 }}"
+      port port="{{ item.0.port }}" protocol="{{ item.0.proto }}"
+      accept
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ db_firewall_ports | subelements('sources') }}"
+  loop_control:
+    label: "{{ item.0.desc }} {{ item.0.port }}/{{ item.0.proto }} from {{ item.1 }}"
+
+# ------------------------------------------------------------
+# etcd 포트 인바운드 허용 (etcd를 DB노드에 같이 올리는 구조일 때)
+# - DB 대역에서만 허용(권장)
+# ------------------------------------------------------------
+- name: Allow etcd ports from etcd allowed source CIDRs (rich rules)
+  ansible.posix.firewalld:
+    zone: "{{ fw_default_zone.stdout }}"
+    rich_rule: >
+      rule family="ipv4"
+      source address="{{ item.1 }}"
+      port port="{{ item.0.port }}" protocol="{{ item.0.proto }}"
+      accept
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ db_firewall_etcd_ports | subelements('sources') }}"
+  loop_control:
+    label: "{{ item.0.desc }} {{ item.0.port }}/{{ item.0.proto }} from {{ item.1 }}"
+
+# ------------------------------------------------------------
+# (주의) NFS(2049)는 "NFS 서버"가 열어야 하는 포트임.
+# DB 노드는 보통 NFS 클라이언트라서 인바운드 2049 오픈이 필요 없음.
+# 네가 기존에 넣어둔 룰을 유지하고 싶다면 아래 블록을 true로 켜서 사용.
+# ------------------------------------------------------------
+- name: Allow NFSv4 port 2049 from DB subnet (optional)
+  ansible.posix.firewalld:
+    zone: "{{ fw_default_zone.stdout }}"
+    rich_rule: >
+      rule family="ipv4"
+      source address="{{ db_subnet_cidr }}"
+      port port="2049" protocol="tcp"
+      accept
+    permanent: true
+    immediate: true
+    state: enabled
+  when: false
+
+- name: Show firewalld rules (debug)
+  ansible.builtin.command: firewall-cmd --zone={{ fw_default_zone.stdout }} --list-all
+  register: fw_list_all
+  changed_when: false
+
+- name: Print firewalld rules (debug)
+  ansible.builtin.debug:
+    var: fw_list_all.stdout
+

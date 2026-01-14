@@ -1,0 +1,100 @@
+---
+# DNS role (command-based, but made reliable)
+
+- name: Install bind server packages (ensure named.service exists)
+  command: dnf -y install bind bind-utils firewalld
+  register: r_dnf
+  changed_when: "'Complete!' in r_dnf.stdout or 'Installed:' in r_dnf.stdout or 'Upgraded:' in r_dnf.stdout"
+  failed_when: r_dnf.rc != 0
+
+- name: Enable and start firewalld
+  command: systemctl enable --now firewalld
+  register: r_fw
+  changed_when: r_fw.rc == 0
+  failed_when: r_fw.rc != 0
+
+- name: Open DNS service (permanent)
+  command: firewall-cmd --permanent --add-service=dns
+  register: r_dns
+  failed_when: false
+  changed_when: "'success' in (r_dns.stdout | lower)"
+
+- name: Reload firewalld
+  command: firewall-cmd --reload
+  register: r_reload
+  failed_when: false
+  changed_when: false
+
+- name: Deploy named.conf
+  template:
+    src: named.conf.j2
+    dest: /etc/named.conf
+    owner: root
+    group: named
+    mode: "0640"
+  register: r_namedconf
+
+- name: Ensure /var/named permissions
+  command: chown -R root:named /var/named
+  changed_when: false
+  failed_when: false
+
+- name: Create zone files from dns_zones
+  template:
+    src: zone.j2
+    dest: "/var/named/{{ item.zone }}.zone"
+    owner: root
+    group: named
+    mode: "0640"
+  loop: "{{ dns_zones }}"
+  vars:
+    zone_name: "{{ item.zone }}"
+    records: "{{ item.records | default([]) }}"
+    # IMPORTANT: use current DNS host IP, not hard-coded prod DNS
+    dns_ip: "{{ ansible_host | default(ansible_default_ipv4.address) }}"
+    serial: "{{ lookup('pipe', 'date +%Y%m%d') }}01"
+  register: r_zones
+
+- name: Restore SELinux context for zone files
+  command: restorecon -Rv /var/named
+  changed_when: false
+  failed_when: false
+
+- name: Validate named.conf
+  command: named-checkconf /etc/named.conf
+  register: r_checkconf
+  changed_when: false
+  failed_when: r_checkconf.rc != 0
+
+- name: Validate zone files
+  command: "named-checkzone {{ item.zone }} /var/named/{{ item.zone }}.zone"
+  loop: "{{ dns_zones }}"
+  register: r_checkzone
+  changed_when: false
+  failed_when: r_checkzone.rc != 0
+
+- name: Enable and start named
+  command: systemctl enable --now named
+  register: r_named
+  failed_when: r_named.rc != 0
+  changed_when: r_named.rc == 0
+
+- name: Restart named only if config changed
+  command: systemctl restart named
+  when: r_namedconf is changed or r_zones is changed
+  register: r_restart
+  failed_when: false
+  changed_when: false
+
+- name: Verify named is active
+  command: systemctl is-active named
+  register: r_active
+  changed_when: false
+  failed_when: r_active.stdout.strip() != "active"
+
+- name: Verify named is listening on port 53
+  shell: "ss -lntup | egrep ':53\\b|named'"
+  register: r_ss
+  changed_when: false
+  failed_when: r_ss.rc != 0
+

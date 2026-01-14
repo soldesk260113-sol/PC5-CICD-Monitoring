@@ -1,0 +1,19 @@
+name: "{{ inventory_hostname }}"
+data-dir: "/var/lib/etcd"
+
+{% set ip = hostvars[inventory_hostname].ansible_host | default(ansible_default_ipv4.address) %}
+
+listen-peer-urls: "http://{{ ip }}:2380"
+listen-client-urls: "http://{{ ip }}:2379,http://127.0.0.1:2379"
+
+initial-advertise-peer-urls: "http://{{ ip }}:2380"
+advertise-client-urls: "http://{{ ip }}:2379"
+
+initial-cluster-token: "{{ etcd_initial_cluster_token | default('etcd-cluster-1') }}"
+initial-cluster-state: "{{ etcd_initial_cluster_state | default('new') }}"
+
+initial-cluster: "{% for h in groups['etcd'] %}{{ h }}=http://{{ hostvars[h].ansible_host | default(hostvars[h].ansible_default_ipv4.address) }}:2380{% if not loop.last %},{% endif %}{% endfor %}"
+
+enable-v2: false
+log-level: "info"
+

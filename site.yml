@@ -11,12 +11,16 @@
 # - OS 기본 설정 (NTP, 방화벽, 패키지 등)
 - import_playbook: playbooks/01_common_setup.yml
 
+# Step 1.5: 보안 계층 (Security Tier) 구축
+# - SECURE(GW), WAF, DNS 서버 설정
+- import_playbook: playbooks/08_deploy_security.yml
+
 # Step 2: PC4 데이터베이스 및 스토리지 구축 (Kubernetes 외부 인프라)
 # - MySQL Replication (Master/Slave/Backup)
 # - ProxySQL (DB 로드밸런싱)
 # - Etcd Cluster (Key-Value Store)
 # - NFS Storage 서버 구성
-# - import_playbook: playbooks/04_db_storage_setup.yml
+- import_playbook: playbooks/04_deploy_db.yml
 
 # Step 3: PC2, PC3, PC6 쿠버네티스 클러스터 구축 (초기화 후 설치)
 # - 3-1: 기존 노드 초기화 (Reset) -> 찌꺼기 제거

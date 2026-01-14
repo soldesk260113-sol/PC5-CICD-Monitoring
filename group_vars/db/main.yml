@@ -1,0 +1,116 @@
+# group_vars/db/main.yml
+
+# Vault 파일 경로(필요시 사용)
+db_vault_vars_file: "{{ playbook_dir }}/../group_vars/db/vault.yml"
+
+# -----------------------------
+# 네트워크
+# -----------------------------
+db_subnet_cidr: "10.2.3.0/24"
+db_gateway_vip: "10.2.3.254"
+
+# (서비스/프록시 등 외부(내부서비스) 대역)
+svc_subnet_cidr: "10.2.2.0/24"
+svc_vip: "10.2.2.254"
+
+# storage1 정적 라우트(문서 7번)
+storage_host: "storage1"
+storage_ip: "10.2.3.30"          # 실제 storage1 IP로 수정
+storage_needs_route: true
+
+# -----------------------------
+# PostgreSQL / Patroni
+# -----------------------------
+pg_version: 16
+pg_port: 5432
+
+patroni_rest_port: 8008
+patroni_scope: "pg-ha"
+patroni_namespace: "/service/"
+
+# Patroni가 사용할 PostgreSQL 경로
+# (RHEL/Rocky 기본 postgresql 패키지 기준: /usr/bin)
+patroni_pg_bin_dir: "/usr/bin"
+patroni_pg_data_dir: "/var/lib/pgsql/patroni"
+patroni_pg_log_dir: "/var/log/postgresql"
+
+# Patroni bootstrap용 계정(필수)
+patroni_superuser: "{{ pg_superuser }}"
+patroni_superuser_password: "{{ pg_superpass }}"
+
+patroni_replication_user: "{{ replication_user }}"
+patroni_replication_password: "{{ replication_pass }}"
+
+# -----------------------------
+# etcd
+# -----------------------------
+etcd_client_port: 2379
+etcd_peer_port: 2380
+
+# etcd endpoints (Patroni 템플릿에서 직접 사용) - 리스트 형태
+etcd_endpoints:
+  - "10.2.3.20:2379"
+  - "10.2.3.21:2379"
+  - "10.2.3.22:2379"
+
+# (호환성 유지용)
+patroni_etcd_endpoints: "10.2.3.2:2379,10.2.3.3:2379,10.2.3.4:2379"
+etcd:
+  hosts: "{{ patroni_etcd_endpoints }}"
+
+# etcd 버전(바이너리 설치 시 사용)
+# etcd_bootstrap_reset: true
+etcd_version: "v3.5.12"
+etcd_download_url: "https://storage.googleapis.com/etcd/v3.5.12/etcd-v3.5.12-linux-amd64.tar.gz"
+
+
+# -----------------------------
+# DB 노드 식별(호스트명과 매핑)
+# -----------------------------
+db_nodes:
+  DB-Active:
+    ip: "10.2.3.2"
+  DB-Standby:
+    ip: "10.2.3.3"
+  DB-Backup:
+    ip: "10.2.3.4"
+
+# -----------------------------
+# 방화벽 정책(중요)
+# -----------------------------
+# DB 노드 방화벽에서 "인바운드 허용"할 소스 대역들
+# - DB 노드끼리는 replication/leader bootstrap 때문에 필수
+# - svc_subnet(Proxy/서비스)에서 DB 접속이 필요하면 5432는 허용해야 함
+db_firewall_allowed_sources:
+  - "{{ db_subnet_cidr }}"
+  - "{{ svc_subnet_cidr }}"
+
+# DB 노드에서 열어줄 인바운드 포트들
+# - PostgreSQL(5432): DB끼리 + 서비스/프록시에서 접근
+# - Patroni REST(8008): 보통 DB끼리만 써도 되지만 운영상 svc_subnet에서도 볼 수 있게 같이 허용
+# - etcd(2379/2380): etcd를 DB노드에서 같이 돌리는 구조면 DB 대역만 허용해도 됨
+db_firewall_ports:
+  - { port: "{{ pg_port }}",           proto: "tcp", sources: "{{ db_firewall_allowed_sources }}", desc: "PostgreSQL" }
+  - { port: "{{ patroni_rest_port }}", proto: "tcp", sources: "{{ db_firewall_allowed_sources }}", desc: "Patroni REST" }
+
+# etcd는 보통 DB대역에서만 클러스터링하므로 DB 대역만 허용(권장)
+db_firewall_etcd_sources:
+  - "{{ db_subnet_cidr }}"
+db_firewall_etcd_ports:
+  - { port: "{{ etcd_client_port }}", proto: "tcp", sources: "{{ db_firewall_etcd_sources }}", desc: "etcd client" }
+  - { port: "{{ etcd_peer_port }}",   proto: "tcp", sources: "{{ db_firewall_etcd_sources }}", desc: "etcd peer" }
+
+# -----------------------------
+# pgBackRest / NFS
+# -----------------------------
+pgbackrest_repo_path: "/mnt/pgbackrest"
+
+nfs_server: "10.2.2.30"           # storage1 IP
+nfs_export: "/exports/pgbackrest" # storage1 export path
+nfs_mount: "/mnt/pgbackrest"
+
+backup_full_schedule: "daily"     # cron/systemd-timer로 확장 가능
+retention_full: 7
+backup_enable: false
+
+  # Vault 로딩(플레이에서 include_vars로 읽는 구조라면 이 변수들은 아래처럼 매핑해서 씀)

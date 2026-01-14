@@ -1,0 +1,34 @@
+---
+# DB-S가 pg_basebackup 할 때 DB-A에서 막히는 문제 해결
+# 에러: no pg_hba.conf entry for replication connection from host "10.2.3.3", user "replicator", SSL off
+
+- name: Ensure Patroni data directory exists
+  ansible.builtin.file:
+    path: "{{ patroni_pg_data_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+
+- name: Allow replication user from DB subnet in pg_hba.conf
+  ansible.builtin.lineinfile:
+    path: "{{ patroni_pg_data_dir }}/pg_hba.conf"
+    create: true
+    owner: postgres
+    group: postgres
+    mode: "0600"
+    insertafter: EOF
+    line: "host replication {{ patroni_replication_user }} {{ db_subnet_cidr }} scram-sha-256"
+  notify: Reload patroni via REST
+
+- name: Allow postgres superuser from DB subnet in pg_hba.conf (optional)
+  ansible.builtin.lineinfile:
+    path: "{{ patroni_pg_data_dir }}/pg_hba.conf"
+    create: true
+    owner: postgres
+    group: postgres
+    mode: "0600"
+    insertafter: EOF
+    line: "host all {{ patroni_superuser }} {{ db_subnet_cidr }} scram-sha-256"
+  notify: Reload patroni via REST
+

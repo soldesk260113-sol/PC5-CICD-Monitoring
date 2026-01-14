@@ -1,0 +1,18 @@
+# NFS
+storage_ip: 10.2.2.30
+nfs_export_path: /export/pgbackrest
+local_mount_path: /mnt/pgbackrest
+
+# pgBackRest
+pgbackrest_stanza: main
+pgbackrest_retention_full: 7
+
+# DB-A (Primary)
+pg_primary_host: 10.2.3.2
+pg_primary_port: 5432
+pg_primary_data_path: /var/lib/pgsql/data
+pg_backup_db_user: postgres
+
+# vault로 넣어야 하는 값
+pg_backup_db_password: "VAULT로 관리"
+

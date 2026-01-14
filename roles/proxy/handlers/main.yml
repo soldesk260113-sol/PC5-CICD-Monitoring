@@ -1,0 +1,26 @@
+---
+- name: restart iptables
+  ansible.builtin.service:
+    name: iptables
+    state: restarted
+
+- name: restart ip6tables
+  ansible.builtin.service:
+    name: ip6tables
+    state: restarted
+  ignore_errors: true
+
+- name: restart haproxy
+  ansible.builtin.service:
+    name: haproxy
+    state: restarted
+
+- name: restart keepalived
+  ansible.builtin.service:
+    name: keepalived
+    state: restarted
+
+- name: reload sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+

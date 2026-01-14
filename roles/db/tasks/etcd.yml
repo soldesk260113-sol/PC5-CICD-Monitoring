@@ -1,0 +1,155 @@
+---
+# ============================================================
+# etcd install & configure
+# - Download once on controller(Proxy1) -> copy to nodes
+# - Avoid GitHub asset download timeouts in lab NAT env
+# ============================================================
+
+# ---- 설정값 (필요시 group_vars/db/main.yml에서 오버라이드) ----
+# etcd_version: "v3.5.12"
+# etcd_download_base: "https://storage.googleapis.com/etcd"
+# etcd_bootstrap_reset: false
+# etcd_cluster_token: "etcd-cluster-1"
+# etcd_initial_cluster_state: "new"
+# etcd_healthcheck: true
+
+- name: Ensure controller files dir exists (run once)
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/files"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  run_once: true
+
+- name: Set etcd download URL (run once)
+  ansible.builtin.set_fact:
+    _etcd_archive_name: "etcd-{{ etcd_version }}-linux-amd64.tar.gz"
+    _etcd_archive_local: "{{ playbook_dir }}/files/etcd-{{ etcd_version }}-linux-amd64.tar.gz"
+    _etcd_download_url: "{{ etcd_download_url | default('https://storage.googleapis.com/etcd/' ~ etcd_version ~ '/etcd-' ~ etcd_version ~ '-linux-amd64.tar.gz') }}"
+  delegate_to: localhost
+  run_once: true
+
+# NOTE:
+# - Google Storage 경로는 보통 v prefix 없이 디렉토리 구성(3.5.12)인 경우가 많아서
+#   (etcd_version에서 선행 v 제거) 로직을 사용
+# - 만약 네가 etcd_version을 "3.5.12"로 쓰면 자동으로도 맞음
+# - 혹시 경로가 다르면 group_vars에서 etcd_download_url을 직접 주는 방식도 가능
+
+- name: Download etcd archive on controller (run once)
+  ansible.builtin.get_url:
+    url: "{{ etcd_download_url | default(_etcd_download_url) }}"
+    dest: "{{ _etcd_archive_local }}"
+    mode: "0644"
+    timeout: 300
+  delegate_to: localhost
+  run_once: true
+  register: _dl
+  retries: 5
+  delay: 10
+  until: _dl is succeeded
+
+- name: Copy etcd archive to node
+  ansible.builtin.copy:
+    src: "{{ _etcd_archive_local }}"
+    dest: "/tmp/{{ _etcd_archive_name }}"
+    mode: "0644"
+
+# 2. 압축 해제
+- name: Unarchive etcd binary
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ _etcd_archive_name }}"
+    dest: "/tmp/"
+    remote_src: true
+    creates: "/tmp/etcd-{{ etcd_version }}-linux-amd64/etcd"
+
+# 3. 바이너리 설치
+- name: Install etcd binaries (etcd + etcdctl)
+  ansible.builtin.copy:
+    src: "/tmp/etcd-{{ etcd_version }}-linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: "0755"
+    remote_src: true
+  loop:
+    - etcd
+    - etcdctl
+
+- name: Create etcd user
+  ansible.builtin.user:
+    name: etcd
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+
+- name: Create etcd directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: "0755"
+  loop:
+    - /etc/etcd
+    - /var/lib/etcd
+
+# (선택) 초기 구축 단계에서만 데이터 디렉토리 클린업
+- name: Clear etcd data dir (bootstrap only)
+  ansible.builtin.file:
+    path: /var/lib/etcd
+    state: absent
+  when: etcd_bootstrap_reset | default(false) | bool
+
+- name: Re-create etcd data dir after reset
+  ansible.builtin.file:
+    path: /var/lib/etcd
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: "0755"
+  when: etcd_bootstrap_reset | default(false) | bool
+
+- name: Render etcd config (YAML)
+  ansible.builtin.template:
+    src: etcd.conf.j2
+    dest: /etc/etcd/etcd.conf
+    owner: etcd
+    group: etcd
+    mode: "0644"
+  notify: restart etcd
+
+- name: Render systemd unit for etcd
+  ansible.builtin.template:
+    src: etcd.service.j2
+    dest: /etc/systemd/system/etcd.service
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart etcd
+
+- name: Reload systemd (daemon-reload)
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start etcd
+  ansible.builtin.service:
+    name: etcd
+    state: started
+    enabled: true
+
+- name: Wait for etcd client port (2379)
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: 2379
+    timeout: 60
+
+# etcd cluster health check (optional)
+- name: Check etcd cluster health (run only on etcd_1)
+  ansible.builtin.command: >
+    /usr/local/bin/etcdctl
+    --endpoints=http://10.2.3.20:2379,http://10.2.3.21:2379,http://10.2.3.22:2379
+    endpoint health -w table
+  register: etcd_health
+  changed_when: false
+  when:
+    - (etcd_healthcheck | default(true)) | bool
+    - inventory_hostname == 'etcd_1'
+

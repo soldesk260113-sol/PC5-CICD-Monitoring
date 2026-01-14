@@ -1,0 +1,82 @@
+---
+# =========================================
+# DNS variables for team-wide internal DNS
+# Maintained by PC1 (DNS/WAF/SECURE)
+#
+# Naming rule:
+#   <host>.<zone>.internal
+#
+# Zones reflect network / role separation
+# =========================================
+
+dns_zones:
+
+  # -----------------------------------------
+  # Core / Security / Infra (PC1)
+  # -----------------------------------------
+  - zone: "core.internal"
+    records:
+      - { name: "secure", ip: "10.2.1.1" }
+      - { name: "waf",    ip: "10.2.1.2" }
+      - { name: "dns",    ip: "10.2.1.3" }
+
+  # -----------------------------------------
+  # Kubernetes Cluster (PC2 / PC3 / PC6)
+  # -----------------------------------------
+  - zone: "k8s.internal"
+    records:
+      - { name: "k8s-api", ip: "10.2.2.100" }
+
+      - { name: "cp1", ip: "10.2.2.2" }
+      - { name: "cp2", ip: "10.2.2.3" }
+      - { name: "cp3", ip: "10.2.2.4" }
+
+      - { name: "wk1", ip: "10.2.2.5" }
+      - { name: "wk2", ip: "10.2.2.6" }
+      - { name: "wk3", ip: "10.2.2.7" }
+      - { name: "wk4", ip: "10.2.2.8" }
+      - { name: "wk5", ip: "10.2.2.9" }
+      - { name: "wk6", ip: "10.2.2.10" }
+
+  # -----------------------------------------
+  # Database Layer (PC4)
+  # -----------------------------------------
+  - zone: "db.internal"
+    records:
+      - { name: "db-vip",       ip: "10.2.2.254" }
+      - { name: "db-proxy1",    ip: "10.2.2.20" }
+      - { name: "db-proxy2",    ip: "10.2.2.21" }
+      - { name: "storage",      ip: "10.2.2.30" }
+
+      - { name: "db-internal",  ip: "10.2.3.254" }
+      - { name: "db-a",         ip: "10.2.3.2" }
+      - { name: "db-s",         ip: "10.2.3.3" }
+      - { name: "db-b",         ip: "10.2.3.4" }
+
+      - { name: "etcd-1",       ip: "10.2.3.20" }
+      - { name: "etcd-2",       ip: "10.2.3.21" }
+      - { name: "etcd-3",       ip: "10.2.3.22" }
+
+  # -----------------------------------------
+  # Service Zone (Web / API on Kubernetes)
+  # -----------------------------------------
+  - zone: "svc.internal"
+    records:
+      - { name: "ingress", ip: "10.2.1.2" }
+
+  # -----------------------------------------
+  # Ops / Management (PC5)
+  # -----------------------------------------
+  - zone: "ops.internal"
+    records:
+      - { name: "ci",  ip: "10.2.2.40" }
+      - { name: "mon", ip: "10.2.2.50" }
+
+  # -----------------------------------------
+  # Edge / Proxy Layer
+  # -----------------------------------------
+  - zone: "edge.internal"
+    records:
+      - { name: "edge", ip: "10.2.1.2" }
+      - { name: "rp1",  ip: "10.2.1.2" }
+

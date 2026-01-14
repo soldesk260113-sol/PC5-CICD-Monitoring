@@ -1,0 +1,100 @@
+---
+# PC1-WAF: Install httpd + ModSecurity + OWASP CRS, activate, DetectionOnly
+
+- name: Install required packages for WAF (httpd + mod_security + CRS + firewalld)
+  shell: |
+    set -e
+    dnf -y install epel-release || true
+    dnf -y install httpd firewalld mod_security mod_security_crs || \
+    dnf -y install httpd firewalld mod_security mod_security_crs-core || true
+  changed_when: false
+
+- name: Enable and start firewalld
+  command: systemctl enable --now firewalld
+
+- name: Enable and start httpd
+  command: systemctl enable --now httpd
+
+- name: Open HTTP/HTTPS service (permanent)
+  command: firewall-cmd --permanent --add-service=http --add-service=https
+  register: r_websvc
+  failed_when: false
+  changed_when: "'success' in (r_websvc.stdout | lower)"
+
+- name: Reload firewalld
+  command: firewall-cmd --reload
+
+# CRS 룰 경로 자동 탐색 + activated_rules에 심링크 활성화
+- name: Activate OWASP CRS rules into activated_rules (symlink)
+  shell: |
+    set -e
+
+    CANDIDATES=(
+      "/usr/share/mod_modsecurity_crs/rules"
+      "/usr/share/modsecurity-crs/rules"
+      "/usr/share/owasp-modsecurity-crs/rules"
+      "/etc/modsecurity.d/owasp-crs/rules"
+    )
+
+    SRC=""
+    for d in "${CANDIDATES[@]}"; do
+      if [ -d "$d" ] && ls "$d"/*.conf >/dev/null 2>&1; then
+        SRC="$d"
+        break
+      fi
+    done
+
+    if [ -z "$SRC" ]; then
+      echo "[ERROR] CRS rules directory not found in candidates." >&2
+      exit 1
+    fi
+
+    DST="/etc/httpd/modsecurity.d/activated_rules"
+    mkdir -p "$DST"
+
+    for f in "$SRC"/*.conf; do
+      ln -sf "$f" "$DST/$(basename "$f")"
+    done
+
+    echo "Activated CRS from: $SRC"
+    echo "Count: $(ls -1 "$DST"/*.conf 2>/dev/null | wc -l)"
+
+# mod_security.conf는 copy로 안전하게 생성 (YAML 파싱 깨짐 방지)
+- name: Ensure mod_security.conf exists (create if missing)
+  copy:
+    dest: /etc/httpd/conf.d/mod_security.conf
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+    content: |
+      <IfModule security2_module>
+        SecRuleEngine DetectionOnly
+      </IfModule>
+
+- name: Set SecRuleEngine to DetectionOnly (enforce)
+  shell: |
+    set -e
+    CONF="/etc/httpd/conf.d/mod_security.conf"
+    sed -ri 's/^\s*SecRuleEngine\s+.*/SecRuleEngine DetectionOnly/I' "$CONF" || true
+    grep -qi '^\s*SecRuleEngine' "$CONF" || echo 'SecRuleEngine DetectionOnly' >> "$CONF"
+
+- name: Apache configtest
+  command: apachectl configtest
+  register: r_conf
+  changed_when: false
+
+- name: Restart httpd to apply CRS and ModSecurity mode
+  command: systemctl restart httpd
+
+- name: Health check (HTTP HEAD)
+  shell: |
+    set -e
+    curl -sI http://127.0.0.1/ | head -n 1
+  register: r_curl
+  changed_when: false
+
+- name: Show health check result
+  debug:
+    msg: "WAF httpd response: {{ r_curl.stdout }}"
+

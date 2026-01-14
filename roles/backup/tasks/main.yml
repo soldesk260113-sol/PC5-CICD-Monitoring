@@ -1,0 +1,21 @@
+---
+- import_tasks: nfs_server.yml
+  when: inventory_hostname == 'Storage'
+
+- import_tasks: nfs_client.yml
+  when: inventory_hostname == 'DB-Backup'
+
+# (추가) DB-B에 pgBackRest 설치/설정/스탠자
+- import_tasks: pgbackrest_install.yml
+  when: inventory_hostname == 'DB-Backup'
+
+- import_tasks: pgbackrest_config.yml
+  when: inventory_hostname == 'DB-Backup'
+
+- import_tasks: pgbackrest_stanza.yml
+  when: inventory_hostname == 'DB-Backup'
+
+# DB-B에서 백업 스크립트 배포 및 크론 등록
+- import_tasks: db_backup_cron.yml
+  when: inventory_hostname == 'DB-Backup'
+

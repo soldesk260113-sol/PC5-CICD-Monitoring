@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euo pipefail
+
+export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
+LOG_FILE="/var/log/db_backup.log"
+
+exec > >(tee -a $LOG_FILE) 2>&1
+
+BACKUP_DIR="{{ local_mount_path }}"
+STANZA="{{ pgbackrest_stanza }}"
+TYPE="full"
+
+echo "-------------------------------------------"
+echo "시작 시간: $(date)"
+echo "작업 대상(Repo): $BACKUP_DIR"
+echo "백업 방식: pgBackRest physical backup (type=$TYPE)"
+echo "-------------------------------------------"
+
+# 1) 마운트 상태 점검
+if ! mountpoint -q "$BACKUP_DIR"; then
+  echo "에러: $BACKUP_DIR 이 마운트되어 있지 않습니다. 백업 중단."
+  exit 1
+fi
+
+# 2) pgBackRest Full 백업 실행 (postgres 계정으로 수행 권장)
+echo "[1/2] pgBackRest Full 백업 시작..."
+sudo -u postgres pgbackrest --stanza="$STANZA" backup --type="$TYPE"
+
+echo "[1/2] pgBackRest Full 백업 완료."
+
+# 3) etcd 스냅샷 (기존 유지)
+echo "[2/2] etcd 백업 중..."
+ETCDCTL_API=3 etcdctl snapshot save ${BACKUP_DIR}/etcd_snapshot_$(date +%Y%m%d_%H%M%S).db
+
+echo "종료 시간: $(date)"
+echo "-------------------------------------------"
+

@@ -1,0 +1,12 @@
+---
+storage_ip: "10.2.2.30"
+nfs_export_path: "/data/db_backups"
+local_mount_path: "/mnt/storage_backup"
+backup_retention_count: 7
+# 2. DB 및 etcd 관련 정보
+db_user: "postgres"
+db_backup_filename: "all_db_backup_{{ ansible_date_time.date }}.sql"
+etcd_backup_filename: "etcd_backup_{{ ansible_date_time.date }}.db"
+
+# 3. OS별 패키지 설정 (그대로 유지)
+nfs_client_package: "{{ (ansible_os_family == 'RedHat') | ternary('nfs-utils', 'nfs-common') }}"

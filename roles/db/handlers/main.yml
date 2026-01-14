@@ -1,0 +1,27 @@
+---
+- name: restart etcd
+  ansible.builtin.systemd:
+    name: etcd
+    state: restarted
+    enabled: true
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart patroni
+  ansible.builtin.systemd:
+    name: patroni
+    state: restarted
+  # Patroni는 DB-Active, DB-Standby에만 설치되어 있으므로 안전장치 유지
+  when: inventory_hostname in ['DB-Active', 'DB-Standby']
+
+- name: Reload patroni via REST
+  ansible.builtin.uri:
+    url: "http://{{ hostvars[inventory_hostname].ansible_host }}:{{ patroni_rest_port }}/reload"
+    method: POST
+    status_code: [200, 202]
+    return_content: true
+  register: patroni_reload_result
+  failed_when: false
+  changed_when: true

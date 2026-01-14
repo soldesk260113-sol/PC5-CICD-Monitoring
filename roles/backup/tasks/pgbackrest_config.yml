@@ -1,0 +1,36 @@
+---
+- name: Create pgbackrest config dir
+  ansible.builtin.file:
+    path: /etc/pgbackrest
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render pgBackRest config
+  ansible.builtin.template:
+    src: pgbackrest.conf.j2
+    dest: /etc/pgbackrest/pgbackrest.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# DB-B에서 postgres로 DB-A 접속할 때 비번을 .pgpass로 처리(권장)
+- name: Create postgres home
+  ansible.builtin.file:
+    path: /var/lib/pgsql
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0755"
+  ignore_errors: true
+
+- name: Install .pgpass for postgres
+  ansible.builtin.template:
+    src: pgpass.j2
+    dest: /var/lib/pgsql/.pgpass
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  ignore_errors: true
+

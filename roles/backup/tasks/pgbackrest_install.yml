@@ -1,0 +1,39 @@
+---
+# CentOS Stream 9 / RHEL9 계열에서 pgBackRest는 기본 repo에 없을 수 있으므로
+# PGDG repo를 추가한 뒤 설치한다.
+
+- name: Install base tooling
+  ansible.builtin.dnf:
+    name:
+      - curl
+      - ca-certificates
+    state: present
+
+# (권장) EPEL 먼저 활성화: libssh2 같은 의존성 이슈 대비
+# - RHEL9 계열에서 pgbackrest가 libssh2를 요구하는 빌드가 있어 EPEL이 필요할 수 있음
+- name: Enable EPEL repository
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  failed_when: false
+
+# PGDG 공식 repo RPM 설치 (EL9 공용)
+# 이 repo가 있어야 pgbackrest 패키지가 제공됨
+- name: Install PGDG repository RPM
+  ansible.builtin.dnf:
+    name: "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+    state: present
+    disable_gpg_check: true
+
+# pgbackrest는 보통 pgdg-common에서 제공됨
+- name: Install pgBackRest
+  ansible.builtin.dnf:
+    name: pgbackrest
+    state: present
+    update_cache: true
+- name: Ensure postgres user exists
+  ansible.builtin.user:
+    name: postgres
+    state: present
+  failed_when: false
+

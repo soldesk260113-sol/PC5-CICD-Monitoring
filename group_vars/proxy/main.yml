@@ -1,0 +1,48 @@
+# vault 자동 로드용 경로
+proxy_vault_vars_file: "{{ playbook_dir }}/../group_vars/proxy/vault.yml"
+
+# OS / NIC 고정값 (문서 확정)
+proxy_external_iface: "ens160"   # 10.2.2.0/24
+proxy_internal_iface: "ens192"   # 10.2.3.0/24
+
+# VIP 2개 (문서 확정)
+proxy_external_vip: "10.2.2.254"
+proxy_external_vip_cidr: "24"
+
+proxy_internal_vip: "10.2.3.254"
+proxy_internal_vip_cidr: "24"
+
+# Keepalived VRRP
+vrrp_router_id: 51
+
+# Proxy Router 기능(문서 필수)
+proxy_enable_ip_forward: true
+
+# firewalld 사용 시 forward 허용/정책 조정(권장: true)
+proxy_configure_firewalld_forward: true
+
+# HAProxy (PostgreSQL)
+haproxy_listen_ip: "{{ proxy_external_vip }}"
+haproxy_listen_port: 5432
+
+# Patroni REST API
+patroni_rest_port: 8008
+patroni_master_path: "/master"
+
+# DB 노드 목록 (문서에 IP 없음 → 반드시 채우기. 비면 실패)
+db_nodes: []
+# 예시(반드시 실제 값으로 채우기):
+db_nodes:
+   - name: "DB-Active"
+     host: "10.2.3.11"
+     pg_port: 5432
+     patroni_port: 8008
+   - name: "DB-Standby"
+     host: "10.2.3.12"
+     pg_port: 5432
+     patroni_port: 8008
+   - name: "DB-Backup"
+     host: "10.2.3.13"
+     pg_port: 5432
+     patroni_port: 8008
+
