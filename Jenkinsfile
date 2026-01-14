@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'PLAYBOOK', choices: ['site.yml', 'playbooks/00_network_provisioning.yml', 'playbooks/01_common_setup.yml', 'playbooks/02_k8s_install.yml', 'playbooks/03_deploy_monitoring.yml', 'playbooks/04_deploy_db.yml', 'playbooks/05_deploy_cicd.yml', 'playbooks/05_configure_jenkins_ssh.yml', 'playbooks/06_deploy_registry.yml', 'playbooks/07_deploy_argocd.yml', 'playbooks/07_reset_argocd_apps.yml', 'playbooks/08_deploy_security.yml'], description: 'Select the playbook to run')
+        choice(name: 'PLAYBOOK', choices: ['site.yml', 'playbooks/00_network_provisioning.yml', 'playbooks/01_common_setup.yml', 'playbooks/02_k8s_install.yml', 'playbooks/03_deploy_monitoring.yml', 'playbooks/04_deploy_db.yml', 'playbooks/05_deploy_cicd.yml', 'playbooks/05_configure_jenkins_ssh.yml', 'playbooks/06_deploy_registry.yml', 'playbooks/07_deploy_argocd.yml', 'playbooks/07_deploy_argocd_apps.yml', 'playbooks/07_reset_argocd_apps.yml', 'playbooks/08_deploy_security.yml'], description: 'Select the playbook to run')
         string(name: 'LIMIT', defaultValue: 'all', description: 'Target hosts limit (e.g. !DB_Servers, PC1, etc). Default: all')
         booleanParam(name: 'DRY_RUN', defaultValue: false, description: 'Run in check mode (dry-run)?')
     }
