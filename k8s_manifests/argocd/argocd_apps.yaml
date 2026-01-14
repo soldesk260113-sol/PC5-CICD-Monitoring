@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: http://10.2.2.40:3001/admin/myapp-helm.git
     targetRevision: HEAD
-    path: map-api/helm
+    path: map-api/helm   # Map API 서비스 Helm 차트 경로
   destination:
     server: https://kubernetes.default.svc
     namespace: production
@@ -33,7 +33,7 @@ spec:
   source:
     repoURL: http://10.2.2.40:3001/admin/myapp-helm.git
     targetRevision: HEAD
-    path: energy-api/helm
+    path: energy-api/helm # Energy API 서비스 Helm 차트 경로
   destination:
     server: https://kubernetes.default.svc
     namespace: production
@@ -56,7 +56,7 @@ spec:
   source:
     repoURL: http://10.2.2.40:3001/admin/myapp-helm.git
     targetRevision: HEAD
-    path: kma-api/helm
+    path: kma-api/helm   # 기상청 API 서비스 Helm 차트 경로
   destination:
     server: https://kubernetes.default.svc
     namespace: production
@@ -79,7 +79,7 @@ spec:
   source:
     repoURL: http://10.2.2.40:3001/admin/myapp-helm.git
     targetRevision: HEAD
-    path: my-web/helm
+    path: my-web/helm    # 웹 프론트엔드 서비스 Helm 차트 경로 (Jenkins CI 연동)
   destination:
     server: https://kubernetes.default.svc
     namespace: production

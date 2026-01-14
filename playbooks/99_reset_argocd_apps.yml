@@ -1,0 +1,25 @@
+---
+- name: Reset ArgoCD Applications
+  hosts: K8S_Primary_Master
+  become: yes
+  tasks:
+    - name: Copy argocd_apps.yaml to Master Node
+      copy:
+        src: /root/Antigravity/Ansible/argocd_apps.yaml
+        dest: /root/argocd_apps.yaml
+
+    - name: Delete existing ArgoCD Applications
+      shell: kubectl delete -f /root/argocd_apps.yaml --ignore-not-found=true
+      register: delete_result
+    
+    - name: Wait for deletion (optional, simplified)
+      pause:
+        seconds: 10
+
+    - name: Apply ArgoCD Applications Fresh
+      shell: kubectl apply -f /root/argocd_apps.yaml
+      register: apply_result
+
+    - name: Display Apply Result
+      debug:
+        msg: "{{ apply_result.stdout_lines }}"

@@ -1,0 +1,22 @@
+---
+- name: Deploy ArgoCD Applications
+  hosts: K8S_Primary_Master
+  become: yes
+  tasks:
+    - name: Copy argocd_apps.yaml to Master Node
+      copy:
+        src: /root/Antigravity/Ansible/k8s_manifests/argocd/argocd_apps.yaml
+        dest: /root/argocd_apps.yaml
+
+    - name: Apply ArgoCD Applications
+      shell: kubectl apply -f /root/argocd_apps.yaml
+      register: apply_result
+
+    - name: Clean up temporary file
+      file:
+        path: /root/argocd_apps.yaml
+        state: absent
+
+    - name: Display Apply Result
+      debug:
+        msg: "{{ apply_result.stdout_lines }}"

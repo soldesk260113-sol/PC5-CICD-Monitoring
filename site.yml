@@ -39,4 +39,6 @@
 # Step 7: ArgoCD 배포 (GitOps CD)
 # - ArgoCD 설치 및 NodePort 노출
 - import_playbook: playbooks/07_deploy_argocd.yml
+# - ArgoCD Applications 설정 (App of Apps)
+- import_playbook: playbooks/07_deploy_argocd_apps.yml
 

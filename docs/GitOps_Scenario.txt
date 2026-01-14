@@ -1,0 +1,131 @@
+# 🛠️ On-Premise GitOps (Helm + DR) 통합 구축 가이드
+
+## 1. 아키텍처 및 흐름 (Workflow)
+애플리케이션 소스(App)와 배포 설정(Helm) 리포지토리를 분리하여 관리하는 표준 GitOps 방식입니다.
+
+1. Dev: 개발자가 App Repo(`myapp-source.git`)에 코드 Push
+2. CI (Jenkins): 도커 이미지(`my-web`) 빌드 -> Harbor Push (자동 백업)
+3. CD Trigger (Jenkins): Jenkins가 Helm Repo(`myapp-helm.git`)의 `values.yaml` 이미지 태그 수정 후 Commit/Push
+4. CD (ArgoCD): Helm Repo 변경 감지 -> K8s에 Helm Chart 기반 배포/업데이트
+
+---
+
+## 2. Gitea 리포지토리 구성
+두 개의 저장소로 분리하여 운영합니다.
+
+1. **Application Repo** (`admin/myapp-source.git`):
+   - 실제 애플리케이션 소스 코드
+   - `src/`, `Dockerfile`, `package.json`
+   - `Jenkinsfile`: CI/CD 파이프라인 스크립트 존재
+
+2. **Helm Chart Repo** (`admin/myapp-helm.git`):
+   - K8s 배포를 위한 Helm 차트 모음 (마이크로서비스 구조)
+   - `my-web/`, `map-api/`, `energy-api/`, `kma-api/` 각 폴더별로 차트 존재
+   - Jenkins는 이 중 `my-web/helm/values.yaml`의 태그 정보를 수정함
+
+---
+
+## 3. Jenkins Pipeline Script (주요 로직)
+Jenkins는 애플리케이션 빌드 후, Helm 차트의 버전을 업데이트하여 배포를 트리거합니다.
+
+```groovy
+pipeline {
+    agent any
+    
+    environment {
+        HARBOR_HOST = '10.2.2.40:5000'
+        IMAGE_NAME = 'my-web'
+        GITEA_HOST = '10.2.2.40:3001'
+    }
+    
+    stages {
+        // [Build & Push]
+        stage('Build & Push Image') {
+            steps {
+                // Docker Build -> Tagging -> Push to Harbor
+                sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
+                sh "docker push ${HARBOR_HOST}/library/${IMAGE_NAME}:${BUILD_NUMBER}"
+            }
+        }
+        
+        // [GitOps Update]
+        stage('Update Helm Chart') {
+            steps {
+                // Helm Repo Clone -> values.yaml 수정 -> Git Push
+                sh """
+                    git clone http://.../admin/myapp-helm.git .
+                    sed -i "s/tag: .*/tag: \\"${BUILD_NUMBER}\\"/" my-web/helm/values.yaml
+                    git commit -m "Bump my-web image tag to ${BUILD_NUMBER}"
+                    git push origin main
+                """
+            }
+        }
+    }
+}
+```
+
+---
+
+## 4. ArgoCD 설정 (Multi-App Management)
+
+개별 애플리케이션을 하나씩 웹 UI에서 등록하는 것은 비효율적입니다.
+따라서 **Declarative(선언적)** 방식으로, 여러 앱의 설정을 담은 YAML 파일(`argocd_apps.yaml`)을 통해 한 번에 관리합니다.
+
+### 4.1. 매니페스트 구조 (`argocd_apps.yaml`)
+이 파일에는 4개의 `Application` 리소스가 정의되어 있습니다. 예시(my-web)는 다음과 같습니다:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-web           # ArgoCD에서 보여질 앱 이름
+  namespace: argocd      # ArgoCD가 설치된 네임스페이스
+spec:
+  project: default
+  source:
+    repoURL: http://10.2.2.40:3001/admin/myapp-helm.git  # Helm 차트 저장소
+    targetRevision: HEAD                                 # 추적할 브랜치 (HEAD=main)
+    path: my-web/helm                                    # 저장소 내 차트 경로
+  destination:
+    server: https://kubernetes.default.svc               # 배포될 클러스터
+    namespace: production                                # 배포될 K8s 네임스페이스
+  syncPolicy:
+    automated:
+      prune: true        # Git에서 파일이 삭제되면 K8s 리소스도 삭제
+      selfHeal: true     # 수동 변경이 발생하면 자동으로 Git 상태로 복구
+    syncOptions:
+      - CreateNamespace=true # 네임스페이스가 없으면 자동 생성
+```
+
+### 4.2. 관리 대상 마이크로서비스
+이 파일 하나로 다음 4개의 서비스가 동시에 배포 및 관리됩니다:
+1. **map-api**: 지도 관련 API 서비스
+2. **energy-api**: 에너지 데이터 처리 서비스
+3. **kma-api**: 기상청 데이터 연동 서비스
+4. **my-web**: 사용자 웹 인터페이스 (Ingress 포함)
+
+### 4.3. 적용 및 관리 명령어
+**앱 등록/업데이트**:
+```bash
+kubectl apply -f /root/Antigravity/Ansible/argocd_apps.yaml
+```
+
+**상태 확인**:
+```bash
+# 앱 목록 확인
+kubectl get application -n argocd
+
+# 상세 상태 확인 (CLI)
+argocd app get my-web
+```
+
+---
+
+## 5. 동작 확인 (Scenario) - **검증 완료**
+1. **Dev (User)**: 코드를 수정하고 Gitea에 Push 합니다.
+2. **Jenkins**:
+    * `my-web:4` 이미지 빌드 및 Harbor 업로드 완료.
+    * Helm 리포지토리의 `my-web/helm/values.yaml` 태그를 `4`로 업데이트 완료.
+3. **ArgoCD**:
+    * 변경 사항을 감지하여 상태가 `OutOfSync` -> `Synced`로 변경됨.
+    * Kubernetes 클러스터의 `my-web` 파드가 `v4` 이미지로 교체됨.
