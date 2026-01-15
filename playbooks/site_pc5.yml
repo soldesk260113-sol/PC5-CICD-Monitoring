@@ -10,19 +10,26 @@
   roles:
     - common
 
-# 2. Monitoring Node (10.2.2.50)
+# 2. Monitoring Node (10.2.2.50, 10.2.2.51)
 - name: Monitoring Stack Setup
   hosts: Monitoring
   become: yes
   roles:
     - monitoring
 
-# 3. CI-OPS Node (10.2.2.40)
+# 3. CICD-OPS Node (10.2.2.40)
 - name: CI/CD & Registry Setup
-  hosts: CI-OPS
+  hosts: CICD-OPS
   become: yes
   roles:
     # Docker/Base is included in respective roles usually, but ensure common base
     - jenkins
     - gitea
     - harbor
+
+# 4. DNS Node (10.2.2.60)
+- name: DNS Setup
+  hosts: DNS
+  become: yes
+  roles:
+    - dns

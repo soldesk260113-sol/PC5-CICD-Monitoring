@@ -1,7 +1,7 @@
 ---
 # Harbor 기본 설정값
 
-# Harbor 호스트명 (CI-OPS 서버)
+# Harbor 호스트명 (CICD-OPS 서버)
 harbor_hostname: "{{ ansible_host }}"
 
 # Harbor 포트

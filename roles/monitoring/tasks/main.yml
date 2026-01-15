@@ -109,8 +109,8 @@
 - name: 11. 모니터링 스택 시작
   shell: |
     cd /opt/monitoring
-    docker-compose down 2>/dev/null || true
-    docker-compose up -d
+    docker compose down 2>/dev/null || true
+    docker compose up -d
   register: compose_result
   changed_when: true
 
