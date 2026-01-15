@@ -30,7 +30,6 @@ SERVERS=(
     # [PC1] Network Boundary
     "10.2.1.1"  # FW (Internal)
     "10.2.1.2"  # WAF (Eth0)
-    "10.2.1.3"  # DNS
 
     # [PC2] K8S Control Plane
     "10.2.2.2"  # CP1
@@ -59,8 +58,11 @@ SERVERS=(
     "10.2.2.30" # Storage
 
     # [PC5] Ops (Self 제외, 타 VM)
+    "10.2.2.40" # CICD
     "10.2.2.50" # Monitoring1
     "10.2.2.51" # Monitoring2
+    "10.2.2.60" # DNS
+
 )
 
 echo "[3/4] 키 배포 시작 (총 ${#SERVERS[@]}대 대상)..."
@@ -79,24 +81,30 @@ for ip in "${SERVERS[@]}"; do
         # ProxyCommand 자체를 하나의 인자로 정확히 전달
         SSH_OPTS+=("-o" "ProxyCommand=ssh -o StrictHostKeyChecking=no -W %h:%p -q root@10.2.2.20")
     fi
+
     host_entry_root="root@$ip"
     host_entry_ansible="ansible@$ip"
-    
+
     # [Fix] Pre-read key content to avoid passing file paths to ssh-copy-id (which fails on read-only FS)
     PUB_KEY_CONTENT=$(cat ~/.ssh/id_rsa.pub)
 
     # 1. Root Key Distribution (Direct SSH)
-    # Check if key exists in authorized_keys, if not append it.
-    sshpass -p "$PASSWORD" ssh "${SSH_OPTS[@]}" "$host_entry_root" "mkdir -p ~/.ssh && chmod 700 ~/.ssh && grep -qF \"$PUB_KEY_CONTENT\" ~/.ssh/authorized_keys 2>/dev/null || echo \"$PUB_KEY_CONTENT\" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+    sshpass -p "$PASSWORD" ssh "${SSH_OPTS[@]}" "$host_entry_root" "mkdir -p ~/.ssh && chmod 700 ~/.ssh && grep -qF \"$PUB_KEY_CONTENT\" ~/.ssh/authorized_keys 2>/dev/null || echo \"$PUB_KEY_CONTENT\" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && restorecon -R -v ~/.ssh 2>/dev/null || true"
     res_root=$?
 
     # 2. Ansible User Key Distribution (Direct SSH)
-    sshpass -p "$PASSWORD" ssh "${SSH_OPTS[@]}" "$host_entry_ansible" "mkdir -p ~/.ssh && chmod 700 ~/.ssh && grep -qF \"$PUB_KEY_CONTENT\" ~/.ssh/authorized_keys 2>/dev/null || echo \"$PUB_KEY_CONTENT\" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+    sshpass -p "$PASSWORD" ssh "${SSH_OPTS[@]}" "$host_entry_ansible" "mkdir -p ~/.ssh && chmod 700 ~/.ssh && grep -qF \"$PUB_KEY_CONTENT\" ~/.ssh/authorized_keys 2>/dev/null || echo \"$PUB_KEY_CONTENT\" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && restorecon -R -v ~/.ssh 2>/dev/null || true"
     res_ansible=$?
     
+    # 3. Verify Passwordless Login (Critical)
+    ssh "${SSH_OPTS[@]}" -o PasswordAuthentication=no -o PubkeyAuthentication=yes "$host_entry_ansible" "exit 0" &>/dev/null
+    res_verify=$?
+
     # 실행 결과 확인
-    if [ $res_root -eq 0 ] || [ $res_ansible -eq 0 ]; then
-        echo -e "✅ [성공] $ip : 키 배포 완료 (Root: $res_root, Ansible: $res_ansible)"
+    if [ $res_verify -eq 0 ]; then
+        echo -e "✅ [성공] $ip : 키 배포 및 무암호 접속 확인 완료."
+    elif [ $res_root -eq 0 ] || [ $res_ansible -eq 0 ]; then
+        echo -e "⚠️ [경고] $ip : 키는 배포되었으나 무암호 접속 실패 (SELinux/권한 문제 가능성)."
     else
         echo -e "❌ [실패] $ip : 접속 불가 (Timeout 또는 인증 실패)"
     fi
