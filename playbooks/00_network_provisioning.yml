@@ -16,6 +16,7 @@
         chdir: "{{ playbook_dir }}/../"
       register: script_result
       ignore_errors: yes
+      check_mode: no
 
     - name: 스크립트 실행 결과 출력
       debug:
