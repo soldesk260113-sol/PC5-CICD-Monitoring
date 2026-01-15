@@ -15,6 +15,13 @@
       loop: "{{ groups['All_Nodes'] }}"
       tags: hosts_file
 
+    - name: Firewalld 서비스 활성화 및 시작
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
     - name: 호스트네임 Prefix 결정 (Tier 감지)
       set_fact:
         tier_prefix: >-

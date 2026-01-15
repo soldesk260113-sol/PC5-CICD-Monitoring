@@ -59,8 +59,8 @@ SERVERS=(
     "10.2.2.30" # Storage
 
     # [PC5] Ops (Self 제외, 타 VM)
-    "10.2.2.50" # Monitoring
-    "10.2.2.51" # DR
+    "10.2.2.50" # Monitoring1
+    "10.2.2.51" # Monitoring2
 )
 
 echo "[3/4] 키 배포 시작 (총 ${#SERVERS[@]}대 대상)..."
@@ -73,7 +73,7 @@ for ip in "${SERVERS[@]}"; do
     # -o StrictHostKeyChecking=no : 지문 확인 무시
     
     # Bash 배열로 옵션 관리 (Quoting 문제 해결)
-    SSH_OPTS=("-o" "StrictHostKeyChecking=no" "-o" "ConnectTimeout=10")
+    SSH_OPTS=("-o" "StrictHostKeyChecking=no" "-o" "UserKnownHostsFile=/dev/null" "-o" "ConnectTimeout=10")
     
     if [[ "$ip" == 10.2.3.* ]]; then
         # ProxyCommand 자체를 하나의 인자로 정확히 전달
