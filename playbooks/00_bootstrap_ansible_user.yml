@@ -33,10 +33,14 @@
         mode: '0440'
         validate: 'visudo -cf %s'
 
-    # 3. SSH Key 배포 (Control Node의 root 키를 ansible 사용자에게 복사)
-    # 주의: Control Node의 ~/.ssh/id_rsa.pub 파일이 존재해야 함.
-    - name: Set up authorized keys for 'ansible' user
+    - name: Set up authorized keys for 'ansible' user (Control Node Root)
       authorized_key:
         user: ansible
         state: present
         key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Set up authorized keys for 'ansible' user (Jenkins Container Root)
+      authorized_key:
+        user: ansible
+        state: present
+        key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC72ePXwy9q9QGoas+3agiNtZ/4UT94ZccZA98FwkvCq5Y9auUldusxYT2sIXi6JMjVVEtGoOZ7SCMtGI61SQx4hYu5BrI1M07bGPvy6jSsRJ3c8iHD+4rQpKP/r1pVk7c/UKw/3zSlwOkg0GsOH4IORw1zlObRibksRE8bSGPQiPJjd+ZYjCnHiUgAZlfNkD2Vm7qZEW7b8WVudRF6YGz5yUSwLw2fzKF+vA3HwaOShL2Iw9j/+vQoP+kbrrOLRpQPpScJ9N97HG3E4BV3LxuOOFndyrOkFEOxv4w712k/MWEiJiUEbbFEOWaKA2laDf6jVPR+/31TMKrUrb4K881lMdTyOazEskkmVqaJ7wG1z/tBnxskOAZaIzN6xNqiLLahzHSaRVXJNXcCPAb6Q29gTVF2+vc68QlTQ1VCCg1Vx43HHwYON4AE7A9DAkhfjVqdjBM0W3MgJcaGvSBPaDX5fpBdkBVivVtL09wnvZakKH59/KKbdqSQToeb2XZp0Mc= root@PC5-CI-OPS"
