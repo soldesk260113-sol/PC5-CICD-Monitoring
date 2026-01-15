@@ -45,12 +45,17 @@
     - name: 감지된 인터페이스로 변수 갱신 (NIC 1 - 주 인터페이스)
       set_fact:
         nic1_interface: "{{ detected_nics.stdout_lines[0] }}"
-      when: detected_nics.stdout_lines | length >= 1
+      when: 
+        - not ansible_check_mode
+        - detected_nics.stdout_lines | length >= 1
 
     - name: 감지된 인터페이스로 변수 갱신 (NIC 2 - 보조 인터페이스)
       set_fact:
         nic2_interface: "{{ detected_nics.stdout_lines[1] }}"
-      when: nic_count|default(0)|int >= 2 and detected_nics.stdout_lines | length >= 2
+      when: 
+        - not ansible_check_mode
+        - nic_count|default(0)|int >= 2 
+        - detected_nics.stdout_lines | length >= 2
 
     - name: 감지된 인터페이스 확인
       debug:
@@ -58,6 +63,7 @@
           - "Found NICs: {{ detected_nics.stdout_lines }}"
           - "Applied NIC 1: {{ nic1_interface }}"
           - "Applied NIC 2: {{ nic2_interface | default('None') }}"
+      when: not ansible_check_mode
 
     - name: NIC 1 설정 ({{ nic1_interface }})
       nmcli:
@@ -69,7 +75,10 @@
         dns4: "{{ nic1_dns | default(omit) }}"
         method4: manual
         state: present
-      when: nic_count|default(0)|int >= 1 and nic1_interface is defined
+      when: 
+        - not ansible_check_mode
+        - nic_count|default(0)|int >= 1 
+        - nic1_interface is defined
 
     # NIC 2 설정 (존재하는 경우)
     - name: NIC 2 설정 ({{ nic2_interface | default('none') }})
@@ -82,11 +91,15 @@
         dns4: "{{ nic2_dns | default(omit) }}"
         method4: manual
         state: present
-      when: nic_count|default(0)|int >= 2 and nic2_interface is defined
+      when: 
+        - not ansible_check_mode
+        - nic_count|default(0)|int >= 2 
+        - nic2_interface is defined
 
     - name: 연결 다시 로드 (NetworkManager)
       shell: nmcli connection reload
       ignore_errors: yes
+      when: not ansible_check_mode
 
     - name: 인터페이스 상태 확인 (변경 사항 적용)
       shell: "nmcli connection up {{ nic1_interface }}"
