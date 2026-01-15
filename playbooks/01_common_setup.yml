@@ -25,11 +25,11 @@
     - name: 호스트네임 Prefix 결정 (Tier 감지)
       set_fact:
         tier_prefix: >-
-          {%- if inventory_hostname in ['SECURE', 'WAF', 'DNS'] -%}PC1
+          {%- if inventory_hostname in ['SECURE', 'WAF'] -%}PC1
           {%- elif 'ControlPlane' in inventory_hostname -%}PC2
           {%- elif inventory_hostname in ['K8S-WorkerNode1', 'K8S-WorkerNode2', 'K8S-WorkerNode3'] -%}PC3
           {%- elif 'DB' in inventory_hostname or 'Storage' in inventory_hostname -%}PC4
-          {%- elif inventory_hostname in ['CI-OPS', 'Monitoring'] -%}PC5
+          {%- elif inventory_hostname in ['CIcD', 'Monitoring'] -%}PC5
           {%- elif inventory_hostname in ['K8S-WorkerNode4', 'K8S-WorkerNode5', 'K8S-WorkerNode6'] -%}PC6
           {%- else -%}PCX{%- endif -%}
 
