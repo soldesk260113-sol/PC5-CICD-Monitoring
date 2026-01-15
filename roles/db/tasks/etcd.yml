@@ -47,6 +47,7 @@
   retries: 5
   delay: 10
   until: _dl is succeeded
+  when: not ansible_check_mode
 
 - name: Copy etcd archive to node
   ansible.builtin.copy:
