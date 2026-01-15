@@ -20,7 +20,11 @@
 
     - name: 스크립트 실행 결과 출력
       debug:
-        msg: "{{ script_result.stdout_lines }}"
+        msg: 
+          - "STDOUT:"
+          - "{{ script_result.stdout_lines }}"
+          - "STDERR:"
+          - "{{ script_result.stderr_lines }}"
 
 # ═══════════════════════════════════════════════════════════════════════════
 - name: 네트워크 인터페이스 프로비저닝
