@@ -7,12 +7,16 @@
   hosts: All_Nodes
   become: yes
   tasks:
-    - name: Hosts 파일 설정 (DNS 등록)
-      lineinfile:
-        path: /etc/hosts
-        line: "{{ hostvars[item].ansible_host }} {{ item }}"
-        state: present
-      loop: "{{ groups['All_Nodes'] }}"
+    - name: Hosts 파일 설정 (Clean Rewrite)
+      copy:
+        dest: /etc/hosts
+        content: |
+          127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+          ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+          {% for host in groups['All_Nodes'] %}
+          {{ hostvars[host].ansible_host }} {{ host }}
+          {% endfor %}
       tags: hosts_file
 
     - name: Firewalld 서비스 활성화 및 시작
