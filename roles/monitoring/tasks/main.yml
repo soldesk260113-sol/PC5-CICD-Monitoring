@@ -143,3 +143,7 @@
   file:
     path: /etc/cron.daily/clear-root-mailbox
     state: absent
+
+- name: 16. 미사용 Docker 이미지 정리 (Clean up dangling images)
+  shell: docker image prune -f
+  ignore_errors: yes
