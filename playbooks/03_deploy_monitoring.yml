@@ -73,12 +73,14 @@
       delegate_to: localhost
       run_once: true
       become: no
+      check_mode: false
 
     - name: 다운로드 확인 (Debug)
       command: ls -l /tmp/node_exporter.tar.gz
       delegate_to: localhost
       run_once: true
       register: file_check
+      check_mode: false
       
     - debug:
         var: file_check.stdout_lines
