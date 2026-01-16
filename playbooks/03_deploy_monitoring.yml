@@ -65,19 +65,28 @@
       ignore_errors: yes
       when: not ansible_check_mode
     
-    # [Controller 측 작업] 바이너리 다운로드
-    - name: Node Exporter 바이너리 다운로드 (Controller)
-      get_url:
-        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-        dest: "{{ playbook_dir }}/node_exporter.tar.gz"
+    # [Controller 측 작업] 바이너리 다운로드 (Curl 사용)
+    - name: Node Exporter 바이너리 다운로드 (Controller - Curl)
+      command: >
+        curl -L -o /tmp/node_exporter.tar.gz 
+        https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
       delegate_to: localhost
       run_once: true
       become: no
 
+    - name: 다운로드 확인 (Debug)
+      command: ls -l /tmp/node_exporter.tar.gz
+      delegate_to: localhost
+      run_once: true
+      register: file_check
+      
+    - debug:
+        var: file_check.stdout_lines
+
     # [대상 서버 작업] 파일 복사
     - name: Node Exporter 바이너리 복사 (Controller -> Remote)
       copy:
-        src: "{{ playbook_dir }}/node_exporter.tar.gz"
+        src: /tmp/node_exporter.tar.gz
         dest: /tmp/node_exporter.tar.gz
 
     - name: Node Exporter 압축 해제
