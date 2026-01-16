@@ -64,25 +64,16 @@
       ignore_errors: yes
       when: not ansible_check_mode
       
-    - name: Check if Node Exporter binary exists
-      stat:
-        path: "{{ playbook_dir }}/../roles/monitoring/files/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-      delegate_to: localhost
-      register: node_exporter_file
-      run_once: true
-      
     - name: Node Exporter 바이너리 다운로드 (Local Controller)
       get_url:
         url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-        dest: "{{ playbook_dir }}/../roles/monitoring/files/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
       delegate_to: localhost
       run_once: true
-      when: not node_exporter_file.stat.exists
-      ignore_errors: yes
 
     - name: Node Exporter 바이너리 복사 (Controller -> Remote)
       copy:
-        src: "{{ playbook_dir }}/../roles/monitoring/files/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
         dest: /tmp/node_exporter.tar.gz
 
     - name: Node Exporter 압축 해제
