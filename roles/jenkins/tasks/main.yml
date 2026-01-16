@@ -67,3 +67,75 @@
     permanent: yes
     immediate: yes
     state: enabled
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Jenkins SSH 키 자동 설정 (재배포 시 자동화)
+# ═══════════════════════════════════════════════════════════════════════════
+
+- name: 9. Jenkins 컨테이너 시작 대기 (30초)
+  wait_for:
+    timeout: 30
+  delegate_to: localhost
+
+- name: 10. Jenkins SSH 디렉토리 생성
+  shell: |
+    docker exec jenkins bash -c "mkdir -p /var/jenkins_home/.ssh && chmod 700 /var/jenkins_home/.ssh"
+  changed_when: false
+
+- name: 11. Jenkins SSH 키 생성 (없을 경우)
+  shell: |
+    docker exec jenkins bash -c "
+      if [ ! -f /var/jenkins_home/.ssh/id_rsa ]; then
+        ssh-keygen -t rsa -b 2048 -N '' -f /var/jenkins_home/.ssh/id_rsa -C 'jenkins@antigravity'
+        chmod 600 /var/jenkins_home/.ssh/id_rsa
+        chmod 644 /var/jenkins_home/.ssh/id_rsa.pub
+        echo 'SSH 키 생성 완료'
+      else
+        echo 'SSH 키 이미 존재'
+      fi
+    "
+  register: ssh_key_result
+  changed_when: "'SSH 키 생성 완료' in ssh_key_result.stdout"
+
+- name: 12. Jenkins SSH Config 파일 생성 (프록시 설정 포함)
+  shell: |
+    docker exec jenkins bash -c "cat > /var/jenkins_home/.ssh/config << 'EOF'
+    # SSH Config for Ansible
+    # 10.2.3.x 서브넷은 DB-Proxy1을 통한 프록시 접속
+    Host 10.2.3.*
+        ProxyCommand ssh -W %h:%p -q ansible@10.2.2.20
+        StrictHostKeyChecking no
+        UserKnownHostsFile=/dev/null
+
+    Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile=/dev/null
+    EOF
+    chmod 600 /var/jenkins_home/.ssh/config
+    "
+  changed_when: true
+
+- name: 13. Jenkins 컨테이너에 sshpass 설치
+  shell: |
+    docker exec jenkins bash -c "
+      if ! command -v sshpass &> /dev/null; then
+        apt-get update -qq && apt-get install -y sshpass > /dev/null 2>&1
+        echo 'sshpass 설치 완료'
+      else
+        echo 'sshpass 이미 설치됨'
+      fi
+    "
+  register: sshpass_result
+  changed_when: "'sshpass 설치 완료' in sshpass_result.stdout"
+
+- name: 14. Jenkins SSH 키 배포 스크립트 실행
+  shell: |
+    cd {{ playbook_dir }}/..
+    ./Script/jenkins_distribute_sshkeys.sh
+  register: ssh_deploy_result
+  changed_when: "'성공' in ssh_deploy_result.stdout"
+  failed_when: ssh_deploy_result.rc != 0
+
+- name: 15. SSH 키 배포 결과 출력
+  debug:
+    msg: "{{ ssh_deploy_result.stdout_lines | select('search', '(성공|실패|스킵|총 서버)') | list }}"

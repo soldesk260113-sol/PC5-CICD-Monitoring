@@ -24,7 +24,7 @@ fi
 # 3. 배포 대상 서버 리스트 (내부 IP 기준)
 # -------------------------------------------------------------------------
 # root 비밀번호 (환경에 맞게 수정 필요)
-PASSWORD="centos"
+PASSWORD="ansible"
 
 SERVERS=(
     # [PC1] Network Boundary
