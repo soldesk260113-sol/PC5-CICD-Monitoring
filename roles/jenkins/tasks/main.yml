@@ -131,7 +131,7 @@
 - name: 14. Jenkins SSH 키 배포 스크립트 실행
   shell: |
     cd {{ playbook_dir }}/..
-    ./Script/jenkins_distribute_sshkeys.sh
+    ./Script/jenkins_distribute_ssh_ansible.sh
   register: ssh_deploy_result
   changed_when: "'성공' in ssh_deploy_result.stdout"
   failed_when: ssh_deploy_result.rc != 0
