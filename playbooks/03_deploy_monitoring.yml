@@ -48,9 +48,8 @@
 # 2단계: 모든 서버에 Node Exporter 설치 (바이너리 방식)
 # 설명: 모든 서버의 CPU, 메모리, 디스크 정보를 수집. 
 #Prometheus로 보내는 에이전트(Node Exporter) 설치.
-# 참고: Storage(NAS)는 SSH 접근 불가로 제외
 - name: Node Exporter 설치 (모든 서버)
-  hosts: All_Nodes:!Storage
+  hosts: All_Nodes
   become: yes
   max_fail_percentage: 50
   gather_facts: no
