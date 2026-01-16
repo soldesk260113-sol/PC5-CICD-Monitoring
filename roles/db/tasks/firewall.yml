@@ -9,11 +9,23 @@
     name: firewalld
     state: started
     enabled: true
+  register: firewalld_service
+  retries: 3
+  delay: 5
+  until: firewalld_service is succeeded
+
+- name: Wait for firewalld to be fully ready
+  ansible.builtin.pause:
+    seconds: 3
+  when: firewalld_service.changed
 
 - name: Detect default firewalld zone
   ansible.builtin.command: firewall-cmd --get-default-zone
   register: fw_default_zone
   changed_when: false
+  retries: 3
+  delay: 2
+  until: fw_default_zone.rc == 0
 
 # ------------------------------------------------------------
 # PostgreSQL / Patroni 인바운드 허용
