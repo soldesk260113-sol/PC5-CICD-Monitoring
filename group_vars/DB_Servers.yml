@@ -1,1 +1,2 @@
 ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q {{ ansible_user }}@10.2.2.20"'
+ansible_become_password: "ansible"
